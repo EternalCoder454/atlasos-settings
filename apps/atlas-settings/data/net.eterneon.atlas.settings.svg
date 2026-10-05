@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <title>Settings</title>
+  <!-- The Atlas apps' tile, as Atlas Updater's icon has it, with a cog on
+       it: Atlas Notes' white, lavender and purple. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a7af4"/>
+      <stop offset="1" stop-color="#5b4bd8"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="25.5" fill="none" stroke="#ffffff" stroke-opacity="0.18"/>
+  <g fill="#ffffff">
+    <rect x="56" y="26" width="16" height="16" rx="3" transform="rotate(0 64 64)"/>
+    <rect x="56" y="26" width="16" height="16" rx="3" transform="rotate(45 64 64)"/>
+    <rect x="56" y="26" width="16" height="16" rx="3" transform="rotate(90 64 64)"/>
+    <rect x="56" y="26" width="16" height="16" rx="3" transform="rotate(135 64 64)"/>
+    <rect x="56" y="26" width="16" height="16" rx="3" transform="rotate(180 64 64)"/>
+    <rect x="56" y="26" width="16" height="16" rx="3" transform="rotate(225 64 64)"/>
+    <rect x="56" y="26" width="16" height="16" rx="3" transform="rotate(270 64 64)"/>
+    <rect x="56" y="26" width="16" height="16" rx="3" transform="rotate(315 64 64)"/>
+    <circle cx="64" cy="64" r="28"/>
+  </g>
+  <circle cx="64" cy="64" r="13" fill="none" stroke="#c9c0ff" stroke-width="5"/>
+  <circle cx="64" cy="64" r="8" fill="#6858e2"/>
+</svg>

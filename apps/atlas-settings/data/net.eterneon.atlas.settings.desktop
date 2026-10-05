@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+GenericName=System Settings
+Comment=Set up Wi-Fi, displays, sound, appearance and more
+Exec=atlas-settings
+Icon=net.eterneon.atlas.settings
+Terminal=false
+Categories=Qt;KDE;Settings;
+Keywords=settings;preferences;configuration;control center;system settings;wifi;network;bluetooth;display;sound;appearance;wallpaper;power;users;keyboard;mouse;
+StartupNotify=true
+SingleMainWindow=true
+X-KDE-StartupNotify=true
+# Hidden until Settings replaces System Settings in the image (the AtlasOS
+# session's cutover); until then it is installed for testing only.
+NoDisplay=true

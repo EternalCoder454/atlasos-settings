@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.eterneon.atlas.settings</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Settings</name>
+  <summary>Set up your computer</summary>
+  <description>
+    <p>Settings is where AtlasOS is set up: Wi-Fi and network, Bluetooth, displays, sound, appearance, the desktop and dock, notifications, power, users, date and time, language, keyboard, mouse and touchpad, printers, default apps, app permissions, privacy, updates and system information.</p>
+    <p>It changes the system through its own services and their permission prompts, and opens Plasma's settings modules for anything it has no page for.</p>
+  </description>
+  <launchable type="desktop-id">net.eterneon.atlas.settings.desktop</launchable>
+  <url type="homepage">https://github.com/EternalCoder454/AtlasOS</url>
+  <url type="vcs-browser">https://github.com/EternalCoder454/atlasos-settings</url>
+  <url type="bugtracker">https://github.com/EternalCoder454/atlasos-settings/issues</url>
+  <developer id="net.eterneon">
+    <name>Eterneon</name>
+  </developer>
+  <categories>
+    <category>Settings</category>
+  </categories>
+  <provides>
+    <binary>atlas-settings</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-10-05"/>
+  </releases>
+</component>
