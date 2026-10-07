@@ -125,3 +125,17 @@ fn symbols_exist_in_atlas_ui_1_4() {
         );
     }
 }
+
+/// Related links go to other pages in the sidebar, each once.
+#[test]
+fn related_pages_are_real() {
+    for p in PAGES {
+        let mut seen = HashSet::new();
+        for r in p.related {
+            let to = pages::page(r).unwrap_or_else(|| panic!("{}: no page {r}", p.id));
+            assert_ne!(to.id, p.id, "{} links to itself", p.id);
+            assert_eq!(to.kind, Kind::Native, "{}: {r} isn't in the sidebar", p.id);
+            assert!(seen.insert(*r), "{}: {r} twice", p.id);
+        }
+    }
+}

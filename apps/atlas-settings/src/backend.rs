@@ -22,8 +22,8 @@ pub mod qobject {
         fn activate(self: Pin<&mut Backend>, args: &QStringList);
 
         /// The pages in sidebar order, as JSON: `[{id, title, symbol, kind,
-        /// kcm, items: [{id, title, kcm, advanced}]}]`. `kind` is `native`
-        /// or `more` (Other Plasma Settings, not in the sidebar); `kcm` the
+        /// kcm, items: [{id, title, kcm, advanced}], related: [page id]}]`.
+        /// `kind` is `native` or `more` (Other Plasma Settings, not in the sidebar); `kcm` the
         /// KCM a native page replaces, offered while the page isn't built.
         #[qinvokable]
         #[cxx_name = "pagesJson"]
@@ -183,6 +183,7 @@ fn pages_json() -> String {
                 "kind": kind,
                 "kcm": replaced_kcm(p.id).unwrap_or_default(),
                 "items": items,
+                "related": p.related,
             })
         })
         .collect();

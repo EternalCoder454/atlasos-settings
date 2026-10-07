@@ -21,6 +21,8 @@ find_package(KF6DBusAddons REQUIRED)
 find_package(KF6WindowSystem REQUIRED)
 find_package(KF6KIO REQUIRED)
 find_package(KF6GuiAddons REQUIRED)
+# Plasma's language and formats (plasma-localerc), written as its KCM does.
+find_package(KF6Config REQUIRED)
 find_package(Corrosion REQUIRED)
 
 set(WORKSPACE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
@@ -69,7 +71,9 @@ endif()
 qt_add_executable(atlas-settings-app
     cpp/main.cpp
     cpp/launcher.cpp
-    cpp/kcmcatalog.cpp)
+    cpp/kcmcatalog.cpp
+    cpp/localeconfig.cpp
+    cpp/pagebackends.cpp)
 set_target_properties(atlas-settings-app PROPERTIES OUTPUT_NAME atlas-settings)
 target_include_directories(atlas-settings-app PRIVATE "${ATLAS_UI_CRATE_DIR}/include")
 
@@ -83,12 +87,19 @@ qt_add_qml_module(atlas-settings-app
         qml/PendingPage.qml
         qml/MoreSettingsPage.qml
         qml/SearchPage.qml
+        qml/SettingsPage.qml
+        qml/AdvancedSection.qml
+        qml/KcmRow.qml
+        qml/RelatedLinks.qml
+        qml/TimeLanguagePage.qml
+        qml/PickerSheet.qml
+        qml/SystemPage.qml
 )
 
 target_link_libraries(atlas-settings-app PRIVATE
     atlas_settings
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons)
+    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore)
 
 install(TARGETS atlas-settings-app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES data/net.eterneon.atlas.settings.desktop

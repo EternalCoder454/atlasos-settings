@@ -17,6 +17,8 @@ AtlasWindow {
     required property var launcher
     // The installed KCMs, for More Settings (cpp/kcmcatalog.h).
     required property var kcmCatalog
+    // Makes a page's backends while it is shown (cpp/pagebackends.h).
+    required property var pageBackends
 
     // The pages in sidebar order (settings-registry), read once. Other
     // Plasma Settings ("more") opens from System, not the sidebar.
@@ -33,6 +35,13 @@ AtlasWindow {
     // The first page of a new install.
     readonly property string firstPage: "home"
 
+    // The pages that are built, by ID; any other shows PendingPage. A page
+    // is made only while it is shown, and its backend with it.
+    readonly property var nativePages: ({
+            "time-language": timeLanguagePage,
+            "system": systemPage
+        })
+
     title: AtlasApp.name
     width: Kirigami.Units.gridUnit * 56
     height: Kirigami.Units.gridUnit * 40
@@ -47,10 +56,18 @@ AtlasWindow {
     function openPage(id: string, item: string) {
         if (!pages.some(p => p.id === id))
             return;
+        // The page again (a sidebar click on the page shown, a link to
+        // another setting on it): made anew, so it opens at its top or at
+        // the setting with Advanced closed, never where it was left.
+        const again = id === pageId && !searching;
         searchField.text = "";
         pageId = id;
         itemId = item;
         saved.setValue("Page", id);
+        if (again) {
+            contentLoader.active = false;
+            contentLoader.active = true;
+        }
     }
 
     // The page shown last time, or the first page.
@@ -197,7 +214,9 @@ AtlasWindow {
                         return searchPage;
                     if (!root.currentPage)
                         return null;
-                    return root.currentPage.kind === "more" ? morePage : pendingPage;
+                    if (root.currentPage.kind === "more")
+                        return morePage;
+                    return root.nativePages[root.currentPage.id] ?? pendingPage;
                 }
             }
         }
@@ -242,6 +261,31 @@ AtlasWindow {
         PendingPage {
             entry: root.currentPage
             onOpenKcm: name => root.openKcm(name, "")
+        }
+    }
+    // The native pages, each wired to the window the same way.
+    Component {
+        id: timeLanguagePage
+        TimeLanguagePage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: systemPage
+        SystemPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
         }
     }
     Component {
