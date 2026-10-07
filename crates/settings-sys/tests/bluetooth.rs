@@ -102,6 +102,42 @@ fn lists_paired_and_nearby_devices() {
     assert_eq!(speaker.kind, Kind::Phone);
 }
 
+/// As real BlueZ does it: a device that sends no name still has an Alias
+/// (its address), and nearby devices have a signal strength.
+#[test]
+fn nearby_devices_need_a_name_and_come_closest_first() {
+    let Some(bus) = start() else { return };
+    adapter(&bus);
+    let set = |path: &str, props: HashMap<&str, Value<'_>>| {
+        let _: () = call(
+            &bus,
+            path,
+            "org.freedesktop.DBus.Mock",
+            "UpdateProperties",
+            &("org.bluez.Device1", props),
+        );
+    };
+    let far = device(&bus, "AA:BB:CC:00:00:11", "Far Speaker");
+    let near = device(&bus, "AA:BB:CC:00:00:12", "Near Speaker");
+    let nameless = device(&bus, "AA:BB:CC:00:00:13", "");
+    set(&far, HashMap::from([("RSSI", Value::from(-90i16))]));
+    set(&near, HashMap::from([("RSSI", Value::from(-40i16))]));
+    set(
+        &nameless,
+        HashMap::from([
+            ("RSSI", Value::from(-30i16)),
+            ("Alias", Value::from("AA-BB-CC-00-00-13")),
+        ]),
+    );
+
+    let s = Bluetooth::new(&bus.bus())
+        .expect("connect")
+        .snapshot()
+        .expect("snapshot");
+    let names: Vec<&str> = s.devices.iter().map(|d| d.name.as_str()).collect();
+    assert_eq!(names, ["Near Speaker", "Far Speaker"]);
+}
+
 #[test]
 fn pairs_connects_and_forgets() {
     let Some(bus) = start() else { return };

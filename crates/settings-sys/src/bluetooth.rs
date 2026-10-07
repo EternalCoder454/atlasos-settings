@@ -171,11 +171,14 @@ fn parse(objects: &Objects) -> (Found, Snapshot) {
                 continue;
             }
             let paired = bool_of(p, "Paired");
-            let named = !str_of(p, "Name").is_empty() || !str_of(p, "Alias").is_empty();
-            let seen = get(p, "RSSI").is_some();
+            // BlueZ always has an Alias (the address, when the device sends
+            // no name), so only Name says the device told us who it is.
+            let named = !str_of(p, "Name").is_empty();
+            let rssi = get(p, "RSSI").and_then(|v| v.downcast_ref::<i16>().ok());
             // Unpaired devices are listed while they are in range and say
-            // who they are; BlueZ keeps the rest cached for minutes.
-            if !paired && !(seen && named) {
+            // who they are, as Windows and macOS list them; BlueZ keeps the
+            // rest cached for minutes, and nameless ones are only addresses.
+            if !paired && !(rssi.is_some() && named) {
                 continue;
             }
             let alias = str_of(p, "Alias");
@@ -191,23 +194,32 @@ fn parse(objects: &Objects) -> (Found, Snapshot) {
                 .and_then(|b| get(b, "Percentage"))
                 .and_then(|v| v.downcast_ref::<u8>().ok())
                 .filter(|p| *p <= 100);
-            devices.push(Device {
+            let device = Device {
                 address,
                 name: clean(&name, MAX_NAME),
                 kind: Kind::from_icon(&str_of(p, "Icon")),
                 paired,
                 connected: bool_of(p, "Connected"),
                 battery,
-            });
+            };
+            devices.push((device, rssi.unwrap_or(i16::MIN)));
         }
     }
-    devices.sort_by(|a, b| {
+    // Paired first (connected ones on top, then by name); nearby ones by
+    // signal, the closest first.
+    devices.sort_by(|(a, ra), (b, rb)| {
         b.paired
             .cmp(&a.paired)
             .then(b.connected.cmp(&a.connected))
+            .then(if a.paired {
+                std::cmp::Ordering::Equal
+            } else {
+                rb.cmp(ra)
+            })
             .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
             .then(a.address.cmp(&b.address))
     });
+    let mut devices: Vec<Device> = devices.into_iter().map(|(d, _)| d).collect();
     devices.dedup_by(|a, b| a.address == b.address);
     devices.truncate(MAX_DEVICES);
     let snapshot = Snapshot {
