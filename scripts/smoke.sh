@@ -40,6 +40,12 @@ export LANG=C.UTF-8 LC_ALL=C.UTF-8
 export QT_QPA_PLATFORM=xcb QT_FORCE_STDERR_LOGGING=1 QT_SCALE_FACTOR=${SMOKE_SCALE:-1}
 unset WAYLAND_DISPLAY
 
+# SMOKE_PRE: a program to run first in the session (services to mock on the
+# session bus, fixtures); see smoke-mock.sh.
+if [ -n "${SMOKE_PRE:-}" ]; then
+    "$SMOKE_PRE" &
+    sleep 1
+fi
 log=$out/app.log
 "$bin" "$@" >"$log" 2>&1 &
 pid=$!
@@ -51,6 +57,13 @@ if ! kill -0 "$pid" 2>/dev/null; then
     echo "smoke: the app exited early" >&2
     cat "$log" >&2
     exit 1
+fi
+# SMOKE_XDO: xdotool commands to run before the screenshot, e.g. to open a
+# sheet ("mousemove 600 300 click 1 sleep 1"); the window is the screen's top left.
+if [ -n "${SMOKE_XDO:-}" ]; then
+    # shellcheck disable=SC2086 # split on purpose
+    xdotool $SMOKE_XDO
+    sleep 1
 fi
 w=$(xdotool search --onlyvisible --name '^Settings' | head -1 || true)
 if [ -n "$w" ]; then

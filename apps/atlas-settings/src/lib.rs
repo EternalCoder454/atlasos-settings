@@ -2,6 +2,7 @@
 //! service; the pages' logic lives here as QObjects exposed to QML, over the
 //! Qt-free `settings-registry` and `settings-sys`.
 
+mod apps_page;
 mod backend;
 mod power_page;
 mod privacy_page;
@@ -27,7 +28,8 @@ pub extern "C" fn atlas_backend_new() -> *mut c_void {
 }
 
 /// A page's backend, made when the page is shown (`cpp/pagebackends.cpp`):
-/// `time-language` or `system`; null for any other kind. Ownership passes to
+/// `time-language`, `system`, `power`, `users`, `privacy` or `apps`; null for
+/// any other kind. Ownership passes to
 /// the caller, which parents it to the page so it goes with it.
 ///
 /// # Safety
@@ -50,6 +52,9 @@ pub unsafe extern "C" fn atlas_page_backend_new(kind: *const c_char) -> *mut c_v
             .into_raw()
             .cast(),
         b"privacy" => privacy_page::qobject::privacy_page_make_unique()
+            .into_raw()
+            .cast(),
+        b"apps" => apps_page::qobject::apps_page_make_unique()
             .into_raw()
             .cast(),
         b"system" => system_info::qobject::system_info_make_unique()

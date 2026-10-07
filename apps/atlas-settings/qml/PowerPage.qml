@@ -148,7 +148,7 @@ SettingsPage {
     Timer {
         interval: 30000
         repeat: true
-        running: page.hasBattery && Qt.application.state === Qt.ApplicationActive
+        running: page.hasBattery && Application.state === Qt.ApplicationActive
         onTriggered: page.sys.refresh()
     }
 

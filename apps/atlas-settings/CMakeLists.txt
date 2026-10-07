@@ -103,6 +103,7 @@ qt_add_qml_module(atlas-settings-app
         qml/PowerPage.qml
         qml/UsersPage.qml
         qml/PrivacyPage.qml
+        qml/AppsPage.qml
         qml/TimeoutSheet.qml
 )
 

@@ -42,6 +42,7 @@ AtlasWindow {
             "power": powerPage,
             "users": usersPage,
             "privacy": privacyPage,
+            "apps": appsPage,
             "system": systemPage
         })
 
@@ -318,6 +319,18 @@ AtlasWindow {
     Component {
         id: privacyPage
         PrivacyPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: appsPage
+        AppsPage {
             entry: root.currentPage
             itemId: root.itemId
             pages: root.pages
