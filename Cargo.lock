@@ -1161,11 +1161,11 @@ dependencies = [
 
 [[package]]
 name = "settings-registry"
-version = "0.3.0"
+version = "0.3.1"
 
 [[package]]
 name = "settings-sys"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-io",
  "futures-lite",
@@ -1320,7 +1320,7 @@ dependencies = [
 
 [[package]]
 name = "telamon-settings"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "cxx",
  "cxx-qt",
