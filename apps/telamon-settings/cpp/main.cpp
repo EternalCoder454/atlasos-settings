@@ -2,6 +2,7 @@
 // launch (`telamon-settings displays`, the systemsettings shim, KRunner) hands
 // its arguments to this one and exits; they are read in Rust
 // (src/backend.rs), never here.
+#include "actionparam.h"
 #include "kcmcatalog.h"
 #include "launcher.h"
 #include "legacyservice.h"
@@ -29,6 +30,15 @@ static void activate(QObject *backend, const QStringList &arguments)
 {
     if (!QMetaObject::invokeMethod(backend, "activate", Q_ARG(QStringList, arguments.mid(1)))) {
         qWarning() << "Backend.activate could not be called: launch arguments were dropped";
+    }
+}
+
+// ActivateAction("open", [link]) and ("open-app", [desktop file ID]), the
+// Launcher's deep links; read in Rust like any launch argument.
+static void activateAction(QObject *backend, const QString &action, const QString &parameter)
+{
+    if (!QMetaObject::invokeMethod(backend, "activateAction", Q_ARG(QString, action), Q_ARG(QString, parameter))) {
+        qWarning() << "Backend.activateAction could not be called: the action was dropped";
     }
 }
 
@@ -107,6 +117,13 @@ int main(int argc, char *argv[])
     QObject::connect(&service, &KDBusService::activateRequested, backend.get(), [e = engine.get(), b = backend.get()](const QStringList &arguments, const QString &) {
         raise(e);
         activate(b, arguments);
+    });
+    // org.freedesktop.Application.ActivateAction, as the Telamon OS Launcher
+    // calls it for a search result (docs/DESIGN.md, "Entry points"). KDBusService
+    // has set the caller's activation token by now; raise() uses it.
+    QObject::connect(&service, &KDBusService::activateActionRequested, backend.get(), [e = engine.get(), b = backend.get()](const QString &action, const QVariant &parameter) {
+        raise(e);
+        activateAction(b, action, actionParameter(parameter));
     });
     // The name this program had (net.eterneon.atlas.settings) still answers
     // org.freedesktop.Application for the Launcher and other programs that

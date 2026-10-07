@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(telamon-settings VERSION 0.3.1 LANGUAGES CXX)
+project(telamon-settings VERSION 0.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,8 +39,11 @@ set(WORKSPACE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 # Rust library (CXX-Qt QObjects, atlas-framework, settings-registry, settings-sys).
 # cxx-qt-build finds Qt via $QMAKE.
 find_program(QMAKE6 NAMES qmake6 qmake REQUIRED)
+# Besides the app's library: the systemsettings shim (systemsettings-shim) and
+# gen-search-index (a binary of settings-registry), which write the files in
+# the telamon-settings-systemsettings package and the Launcher's index.
 corrosion_import_crate(MANIFEST_PATH ${WORKSPACE_DIR}/Cargo.toml
-    CRATES telamon-settings LOCKED)
+    CRATES telamon-settings systemsettings-shim settings-registry LOCKED)
 corrosion_set_env_vars(telamon_settings QMAKE=${QMAKE6})
 
 # The framework's C header (telamon/app.h) comes with the crate's sources,
@@ -167,6 +170,12 @@ if(BUILD_TESTING)
     target_include_directories(legacyservice_test PRIVATE cpp)
     target_link_libraries(legacyservice_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
     set_target_properties(legacyservice_test PROPERTIES AUTOMOC ON)
+    # org.freedesktop.Application.ActivateAction on KDBusService's name (the
+    # Launcher's deep links), on the same private bus.
+    add_executable(actionservice_test tests/actionservice_test.cpp cpp/actionparam.h)
+    target_include_directories(actionservice_test PRIVATE cpp)
+    target_link_libraries(actionservice_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test KF6::DBusAddons)
+    set_target_properties(actionservice_test PROPERTIES AUTOMOC ON)
     # Stands in for KWin and Plasma's shell in the smoke runs (never installed).
     add_executable(fake_desktop tests/fake_desktop.cpp tests/fakes.h)
     target_link_libraries(fake_desktop PRIVATE Qt6::Core Qt6::DBus)
@@ -174,9 +183,11 @@ if(BUILD_TESTING)
     if(DBUS_RUN_SESSION)
         add_test(NAME pageconfig COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:pageconfig_test>)
         add_test(NAME legacyservice COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:legacyservice_test>)
+        add_test(NAME actionservice COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:actionservice_test>)
     else()
         add_test(NAME pageconfig COMMAND pageconfig_test)
         add_test(NAME legacyservice COMMAND legacyservice_test)
+        add_test(NAME actionservice COMMAND actionservice_test)
     endif()
 endif()
 
@@ -222,6 +233,31 @@ endif()
 
 install(TARGETS telamon-settings-app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES data/net.eterneon.telamon.settings.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+# Plasma's global shortcuts read X-KDE-Shortcuts from the copies here (System
+# Settings had Meta+I this way, in kglobalaccel/systemsettings.desktop).
+install(FILES data/net.eterneon.telamon.settings.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/kglobalaccel)
+install(FILES data/net.eterneon.telamon.settings.service
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/dbus-1/services)
+
+# The Launcher's search index, from the page registry so it can't drift
+# (settings-registry's index.rs). It is Settings' own file.
+set(SEARCH_INDEX ${CMAKE_CURRENT_BINARY_DIR}/search-index.json)
+add_custom_command(OUTPUT ${SEARCH_INDEX}
+    COMMAND $<TARGET_FILE:gen-search-index> ${SEARCH_INDEX}
+    DEPENDS gen-search-index
+    COMMENT "Writing the Launcher's search index"
+    VERBATIM)
+add_custom_target(search-index ALL DEPENDS ${SEARCH_INDEX})
+install(FILES ${SEARCH_INDEX}
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/telamon-settings)
+
+# What takes over System Settings' entry points at cutover
+# (telamon-settings-systemsettings in the spec): the systemsettings command
+# and the hidden desktop files KCMLauncher and old pins look up.
+install(PROGRAMS $<TARGET_FILE:systemsettings> DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES data/systemsettings.desktop data/kdesystemsettings.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES data/net.eterneon.telamon.settings.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
