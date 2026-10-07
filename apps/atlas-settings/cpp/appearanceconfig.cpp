@@ -223,9 +223,23 @@ QString AppearanceConfig::currentScheme() const
 
 QString AppearanceConfig::accentHex() const
 {
+    // "r,g,b" as Plasma writes it, parsed here: KConfig's QColor reading
+    // lives in KConfigGui, which --as-needed drops when nothing else calls
+    // it, and then gives an invalid colour.
     KConfig config = kdeutil::user(u"kdeglobals"_s);
-    const QColor color = KConfigGroup(&config, u"General"_s).readEntry("AccentColor", QColor());
-    return color.isValid() ? color.name() : QString();
+    const QStringList parts = KConfigGroup(&config, u"General"_s).readEntry("AccentColor", QString()).split(u',');
+    if (parts.size() < 3) {
+        return QString();
+    }
+    int rgb[3];
+    for (int i = 0; i < 3; ++i) {
+        bool ok = false;
+        rgb[i] = parts.at(i).trimmed().toInt(&ok);
+        if (!ok || rgb[i] < 0 || rgb[i] > 255) {
+            return QString();
+        }
+    }
+    return QColor(rgb[0], rgb[1], rgb[2]).name();
 }
 
 bool AppearanceConfig::validColor(const QString &hex)
@@ -385,7 +399,7 @@ void AppearanceConfig::setAccent(const QString &hex)
         KConfigGroup g(&config, u"General"_s);
         g.writeEntry("accentColorFromWallpaper", false, kdeutil::Notify);
         if (!hex.isEmpty() && hex.compare(QLatin1String(dark ? VioletDark : VioletLight), Qt::CaseInsensitive) != 0) {
-            g.writeEntry("LastUsedCustomAccentColor", QColor(hex), kdeutil::Notify);
+            g.writeEntry("LastUsedCustomAccentColor", colorKey(QColor(hex)), kdeutil::Notify);
         }
         config.sync();
     }
