@@ -50,6 +50,9 @@ BuildRequires:  cmake(KF6Config)
 # API on PipeWire, through PulseAudioQt (Plasma's).
 BuildRequires:  cmake(KF6Screen)
 BuildRequires:  cmake(KF6PulseAudioQt)
+BuildRequires:  cmake(KF6Service)
+# crypt(3), for the password hash AccountsService takes
+BuildRequires:  libxcrypt-devel
 # QML modules qmlcachegen resolves at build time (not linked). atlas-ui comes
 # from atlas-framework, which is in no repository: install its RPMs first
 # (build-rpm.sh does, given ATLAS_LOCAL_RPMS).

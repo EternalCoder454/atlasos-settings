@@ -80,6 +80,11 @@ takes over `systemsettings` (see "Entry points").
   KConfig and KWin side of Appearance, Keyboard & Mouse, Notifications and
   Accessibility (`cpp/appearanceconfig.cpp` and the like, see below) and
   `qml/`.
+
+  `cpp/localeconfig.cpp` (Plasma's `plasma-localerc`, through KConfig),
+  `cpp/powerconfig.cpp`, `cpp/screenlockconfig.cpp`,
+  `cpp/autostartconfig.cpp` and `cpp/defaultapps.cpp` (more KConfig and
+  KService) and `qml/`.
 - The page kit in `qml/`: `SettingsPage` (an `AtlasPage` with the page's
   registry entry; scrolls to and briefly highlights the row a link or
   search asked for, found by its `objectName` = the item ID, and opens
@@ -315,6 +320,60 @@ Plasma shell calls against fakes (`tests/fakes.h`) on a private session bus.
   them. **Zoom** is kwinrc `[Plugins] zoomEnabled` and the effect;
   **Sticky Keys** and the other helps are kaccessrc `[Keyboard]` and
   `[Mouse]`.
+
+## Power & Battery, Users, Privacy & Security and Apps
+
+Each page's system calls are `settings-sys` clients tested against
+python-dbusmock (templates for the services it has none for are in
+`crates/settings-sys/tests/templates`); each page's files are KConfig or
+KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
+(`apps/atlas-settings/tests/configtests.cpp`, `-DATLAS_SETTINGS_TESTS=ON`).
+
+- **Power & Battery.** The power mode is power-profiles-daemon's
+  `ActiveProfile` (`net.hadess.PowerProfiles`, or UPower's name for it from
+  0.20). The battery is the first UPower device that is a present power
+  supply battery; a computer without one shows no battery rows (and no lid
+  row without `LidIsPresent`). The charge limit is UPower's
+  `EnableChargeThreshold`, shown only when `ChargeThresholdSupported`.
+  Turn Off the Screen, Sleep, the lid and the power button are
+  `powerdevilrc` as kcm_powerdevilprofilesconfig writes it
+  (`[AC]`/`[Battery]` `[Display]` and `[SuspendAndShutdown]`; "never" is the
+  idle switch off and `-1`), written through KConfig with the change
+  notification, then PowerDevil's `reparseConfiguration`. A computer with
+  a battery writes both profiles. Defaults for keys the file doesn't have
+  are PowerDevil's (`cpp/powerconfig.cpp`).
+- **Users.** AccountsService for the users, with the signed-in user found
+  by uid. `SetPassword` takes a SHA-512 crypt(3) hash, made with libcrypt
+  and a random salt (`settings_sys::accounts::hash_password`): the clear
+  text is held for the call only (overwritten after) and is never logged.
+  Calls that may ask for a password send the polkit interactive flag.
+  Add User creates the user and sets the password, and removes the user
+  again when the password can't be set. Fingerprints are fprintd's:
+  enrolling claims the reader, listens for `EnrollStatus` and always calls
+  `EnrollStop` and `Release`.
+- **Privacy & Security.** Screen Lock is `kscreenlockerrc` `[Daemon]`
+  (`Autolock`, `Timeout`, `LockOnResume`). Location Services is GeoClue's
+  agent (`geoclue-demo-agent.desktop`, which Plasma has no agent of its
+  own for): turned off by a `Hidden=true` file of the same name in
+  `~/.config/autostart`, so it takes effect at the next sign-in. The
+  Firewall switch starts and enables, or stops and disables,
+  `firewalld.service` through systemd; firewalld is only asked while
+  systemd says it runs, because a call would start it again. Allowed Apps
+  and Ports are the runtime zone API for the zone in use, made permanent
+  with `runtimeToPermanent`. Crash Reports are atlas-framework-system's
+  per-user setting (`~/.config/atlas/crash-reporting.toml`), saved with the
+  same call Updater uses, then Updater's tray is told to `Reload`.
+- **Apps.** Default Apps are `~/.config/mimeapps.list` (`[Default
+  Applications]`, `[Added Associations]`) for the file types a kind covers,
+  chosen only among the apps KService offers for it; the terminal is
+  `kdeglobals` `[General]` `TerminalApplication` and `TerminalService`.
+  Startup Apps are the XDG autostart folders: a system entry is turned off by
+  a user file with `Hidden=true`, never by editing the system's file.
+  App Permissions are, for each installed Flatpak app, the user's override
+  file (`~/.local/share/flatpak/overrides/<app>`, `[Context]`; only what
+  differs from the app's metadata and the global override is written, other
+  groups and keys are kept) and the portals' PermissionStore for
+  background, camera, microphone and screen access.
 
 ## Launch arguments and single instance
 

@@ -2,12 +2,16 @@
 
 #include "accessibilityconfig.h"
 #include "appearanceconfig.h"
+#include "autostartconfig.h"
 #include "colorscheme.h"
+#include "defaultapps.h"
 #include "inputconfig.h"
 #include "localeconfig.h"
 #include "nightlight.h"
 #include "notificationsconfig.h"
+#include "powerconfig.h"
 #include "screenconfig.h"
+#include "screenlockconfig.h"
 #include "soundmixer.h"
 
 #include <QDebug>
@@ -37,6 +41,14 @@ QObject *PageBackends::create(const QString &kind, QObject *parent)
         object = new NotificationsConfig;
     } else if (kind == QLatin1String("accessibility")) {
         object = new AccessibilityConfig;
+    } else if (kind == QLatin1String("power-config")) {
+        object = new PowerConfig;
+    } else if (kind == QLatin1String("screenlock-config")) {
+        object = new ScreenLockConfig;
+    } else if (kind == QLatin1String("autostart-config")) {
+        object = new AutostartConfig;
+    } else if (kind == QLatin1String("default-apps")) {
+        object = new DefaultApps;
     } else {
         object = static_cast<QObject *>(atlas_page_backend_new(kind.toUtf8().constData()));
     }

@@ -26,6 +26,8 @@ find_package(KF6Config REQUIRED)
 # Displays: the screens through libkscreen, as Plasma's Display Configuration
 # reads and sets them; Night Light writes kwinrc through KConfig.
 find_package(KF6Screen REQUIRED)
+# The installed apps (default apps, startup apps): KApplicationTrader.
+find_package(KF6Service REQUIRED)
 find_package(Corrosion REQUIRED)
 
 set(WORKSPACE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
@@ -81,7 +83,11 @@ qt_add_executable(atlas-settings-app
     cpp/appearanceconfig.cpp
     cpp/inputconfig.cpp
     cpp/notificationsconfig.cpp
-    cpp/accessibilityconfig.cpp)
+    cpp/accessibilityconfig.cpp
+    cpp/powerconfig.cpp
+    cpp/screenlockconfig.cpp
+    cpp/autostartconfig.cpp
+    cpp/defaultapps.cpp)
 set_target_properties(atlas-settings-app PROPERTIES OUTPUT_NAME atlas-settings)
 target_include_directories(atlas-settings-app PRIVATE "${ATLAS_UI_CRATE_DIR}/include")
 
@@ -112,12 +118,19 @@ qt_add_qml_module(atlas-settings-app
         qml/InputPage.qml
         qml/NotificationsPage.qml
         qml/AccessibilityPage.qml
+        qml/PowerPage.qml
+        qml/UsersPage.qml
+        qml/PrivacyPage.qml
+        qml/AppsPage.qml
+        qml/TimeoutSheet.qml
 )
 
 target_link_libraries(atlas-settings-app PRIVATE
     atlas_settings
     Qt6::Core Qt6::DBus Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore KF6::ConfigGui)
+    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore KF6::ConfigGui KF6::Service
+    # crypt(3), for the password hash AccountsService takes (settings-sys).
+    crypt)
 
 # Tests of the page backends that write Plasma's settings: against a temporary
 # config folder and fake KWin and Plasma shell services on a private session
@@ -194,3 +207,19 @@ install(FILES data/net.eterneon.atlas.settings.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
 install(FILES data/net.eterneon.atlas.settings.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+
+# The KConfig-backed settings' tests: cmake -DATLAS_SETTINGS_TESTS=ON, then ctest.
+# They write only into a temporary XDG_CONFIG_HOME.
+option(ATLAS_SETTINGS_TESTS "Build the KConfig tests" OFF)
+if(ATLAS_SETTINGS_TESTS)
+    find_package(Qt6 6.11 REQUIRED COMPONENTS Test)
+    enable_testing()
+    add_executable(configtests tests/configtests.cpp
+        cpp/powerconfig.cpp
+        cpp/screenlockconfig.cpp
+        cpp/autostartconfig.cpp
+        cpp/defaultapps.cpp)
+    target_link_libraries(configtests PRIVATE Qt6::Core Qt6::Test
+        KF6::ConfigCore KF6::CoreAddons KF6::Service)
+    add_test(NAME configtests COMMAND configtests)
+endif()

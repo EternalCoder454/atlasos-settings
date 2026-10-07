@@ -2,12 +2,16 @@
 //! service; the pages' logic lives here as QObjects exposed to QML, over the
 //! Qt-free `settings-registry` and `settings-sys`.
 
+mod apps_page;
 mod backend;
 mod bluetooth;
 mod network;
+mod power_page;
+mod privacy_page;
 mod support;
 mod system_info;
 mod time_language;
+mod users_page;
 mod worker;
 
 atlas_framework_ui::app! {
@@ -27,7 +31,8 @@ pub extern "C" fn atlas_backend_new() -> *mut c_void {
 }
 
 /// A page's backend, made when the page is shown (`cpp/pagebackends.cpp`):
-/// `time-language` or `system`; null for any other kind. Ownership passes to
+/// `time-language`, `system`, `power`, `users`, `privacy` or `apps`; null for
+/// any other kind. Ownership passes to
 /// the caller, which parents it to the page so it goes with it.
 ///
 /// # Safety
@@ -41,6 +46,18 @@ pub unsafe extern "C" fn atlas_page_backend_new(kind: *const c_char) -> *mut c_v
     let kind = unsafe { CStr::from_ptr(kind) }.to_bytes();
     match kind {
         b"time-language" => time_language::qobject::time_language_make_unique()
+            .into_raw()
+            .cast(),
+        b"power" => power_page::qobject::power_page_make_unique()
+            .into_raw()
+            .cast(),
+        b"users" => users_page::qobject::users_page_make_unique()
+            .into_raw()
+            .cast(),
+        b"privacy" => privacy_page::qobject::privacy_page_make_unique()
+            .into_raw()
+            .cast(),
+        b"apps" => apps_page::qobject::apps_page_make_unique()
             .into_raw()
             .cast(),
         b"system" => system_info::qobject::system_info_make_unique()
