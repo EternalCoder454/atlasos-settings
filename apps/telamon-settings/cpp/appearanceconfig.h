@@ -40,7 +40,10 @@ public:
 
     // {scheme, dark, highContrast, accent ("#rrggbb" or "" for the scheme's
     // own), accentFromWallpaper, accentIsDefault, lookAndFeel, wallpaper:
-    // {id, name}}.
+    // {id, name, preview, picture, pictureDark}}. `picture` is the image of
+    // the main screen's wallpaper (file URL; Telamon OS's own when none is
+    // set), `pictureDark` the one for a dark colour scheme ("" when it has no
+    // other).
     Q_INVOKABLE QVariantMap read() const;
 
     // Light (false) or Dark (true): the scheme, and the icons and window
@@ -56,6 +59,10 @@ public:
     // installed wallpapers and the pictures in ~/Pictures.
     Q_INVOKABLE QVariantList wallpapers() const;
     Q_INVOKABLE void setWallpaper(const QString &id);
+    // {picture, pictureDark} of a wallpaper wallpapers() lists, as read()'s
+    // wallpaper has them, so the page can show a choice before Plasma has
+    // saved it.
+    Q_INVOKABLE QVariantMap wallpaperPictures(const QString &id) const;
 
     // [{id, name, description}]: the Global Themes installed.
     Q_INVOKABLE QVariantList lookAndFeels() const;

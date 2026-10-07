@@ -234,6 +234,86 @@ private Q_SLOTS:
         QCOMPARE(cfg.read().value(u"wallpaper"_s).toMap().value(u"name"_s).toString(), u"AtlasOS Wave"_s);
     }
 
+    void wallpaperPicturesForThePreview()
+    {
+        const QString sys = dir("sys") + u"/wallpapers/"_s;
+        // A package with one image per screen size, and a dark variant: the
+        // largest up to 2560 wide, not the 5K one.
+        write(sys + u"Pic/metadata.json"_s, R"({"KPlugin": {"Id": "Pic", "Name": "Pic"}})");
+        write(sys + u"Pic/contents/screenshot.jpg"_s, "x");
+        for (const char *name : {"1280x800.jpg", "2560x1600.png", "5120x3200.jpg", "notes.txt", "3840x2160.jxl"}) {
+            write(sys + u"Pic/contents/images/"_s + QString::fromLatin1(name), "x");
+        }
+        write(sys + u"Pic/contents/images_dark/1920x1200.jpg"_s, "x");
+        // Only too wide images: the narrowest.
+        write(sys + u"Wide/metadata.json"_s, R"({"KPlugin": {"Id": "Wide", "Name": "Wide"}})");
+        write(sys + u"Wide/contents/screenshot.jpg"_s, "x");
+        write(sys + u"Wide/contents/images/7680x4320.jpg"_s, "x");
+        write(sys + u"Wide/contents/images/5120x2880.jpg"_s, "x");
+        // Telamon OS's own: what the preview draws when no wallpaper is set.
+        write(sys + u"Telamon/metadata.json"_s, R"({"KPlugin": {"Id": "Telamon", "Name": "Telamon"}})");
+        write(sys + u"Telamon/contents/images/1920x1200.jpg"_s, "x");
+
+        AppearanceConfig cfg;
+        const auto url = [](const QString &path) { return QUrl::fromLocalFile(path).toString(); };
+        QVariantMap w = cfg.read().value(u"wallpaper"_s).toMap();
+        QCOMPARE(w.value(u"id"_s).toString(), QString());
+        QCOMPARE(w.value(u"picture"_s).toString(), url(sys + u"Telamon/contents/images/1920x1200.jpg"_s));
+        QCOMPARE(w.value(u"pictureDark"_s).toString(), QString());
+
+        const QString applets = dir("config") + u"/plasma-org.kde.plasma.desktop-appletsrc"_s;
+        write(applets, "[Containments][1][Wallpaper][org.kde.image][General]\nImage=file://" + sys.toUtf8() + "Pic/\n");
+        w = cfg.read().value(u"wallpaper"_s).toMap();
+        QCOMPARE(w.value(u"id"_s).toString(), u"Pic"_s);
+        QCOMPARE(w.value(u"picture"_s).toString(), url(sys + u"Pic/contents/images/2560x1600.png"_s));
+        QCOMPARE(w.value(u"pictureDark"_s).toString(), url(sys + u"Pic/contents/images_dark/1920x1200.jpg"_s));
+        QCOMPARE(cfg.wallpaperPictures(u"Pic"_s).value(u"picture"_s).toString(), w.value(u"picture"_s).toString());
+        QCOMPARE(cfg.wallpaperPictures(u"Wide"_s).value(u"picture"_s).toString(), url(sys + u"Wide/contents/images/5120x2880.jpg"_s));
+        // Only what wallpapers() lists.
+        QVERIFY(cfg.wallpaperPictures(u"/etc/passwd"_s).isEmpty());
+        QVERIFY(cfg.wallpaperPictures(u"nothing"_s).isEmpty());
+        QCOMPARE(cfg.wallpaperPictures(dir("pictures") + u"/photo.jpg"_s).value(u"picture"_s).toString(), url(dir("pictures") + u"/photo.jpg"_s));
+
+        // A picture file: that file, and no dark one.
+        write(applets, "[Containments][1][Wallpaper][org.kde.image][General]\nImage=file://" + dir("pictures").toUtf8() + "/photo.jpg\n");
+        w = cfg.read().value(u"wallpaper"_s).toMap();
+        QCOMPARE(w.value(u"picture"_s).toString(), url(dir("pictures") + u"/photo.jpg"_s));
+        QCOMPARE(w.value(u"pictureDark"_s).toString(), QString());
+
+        // Two screens: the main one's (containment 0) wins, whatever the order;
+        // a slideshow is not a picture.
+        write(applets,
+              "[Containments][1][Wallpaper][org.kde.image][General]\nImage=file://" + dir("pictures").toUtf8() + "/photo.jpg\n"
+              "[Containments][1]\nlastScreen=1\n"
+              "[Containments][2][Wallpaper][org.kde.image][General]\nImage=file://" + sys.toUtf8() + "Pic/\n"
+              "[Containments][2]\nlastScreen=0\n"
+              "[Containments][3][Wallpaper][org.kde.image][General]\nImage=file://" + sys.toUtf8() + "Wide/\n"
+              "[Containments][3]\nlastScreen=2\nwallpaperplugin=org.kde.slideshow\n");
+        QCOMPARE(cfg.read().value(u"wallpaper"_s).toMap().value(u"id"_s).toString(), u"Pic"_s);
+        write(applets,
+              "[Containments][1][Wallpaper][org.kde.image][General]\nImage=file://" + sys.toUtf8() + "Wide/\n"
+              "[Containments][1]\nlastScreen=0\nwallpaperplugin=org.kde.slideshow\n");
+        QCOMPARE(cfg.read().value(u"wallpaper"_s).toMap().value(u"id"_s).toString(), QString());
+    }
+
+    void wallpaperFileChangesAreAnnounced()
+    {
+        // Plasma saves its applets file a while after a change, by replacing
+        // it: the page is told, also for the second save.
+        const QString applets = dir("config") + u"/plasma-org.kde.plasma.desktop-appletsrc"_s;
+        write(applets, "[Containments][1]\nlastScreen=0\n");
+        AppearanceConfig cfg;
+        QSignalSpy changed(&cfg, &AppearanceConfig::changed);
+        for (int i = 0; i < 2; ++i) {
+            QFile::remove(applets + u".new"_s);
+            write(applets + u".new"_s, "[Containments][1]\nlastScreen=0\nx=" + QByteArray::number(i) + "\n");
+            QVERIFY(QFile::remove(applets));
+            QVERIFY(QFile::rename(applets + u".new"_s, applets));
+            QVERIFY2(changed.wait(3000), "no change announced");
+            changed.clear();
+        }
+    }
+
     void globalThemes()
     {
         AppearanceConfig cfg;
