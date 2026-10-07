@@ -87,8 +87,8 @@ takes over `systemsettings` (see "Entry points").
   (the registry's `related` pages) and `PickerSheet` (a searchable list in
   a sheet). `Main.qml` maps page IDs to their components (`nativePages`);
   any other page shows `PendingPage`.
-- Later: Displays (libkscreen) and the PipeWire side of Sound (libpulse) in
-  C++, because their only stable API is C++/C; decided by spikes S1 and S2.
+- Displays (libkscreen) and the PipeWire side of Sound (PulseAudioQt) are in
+  C++, because their only stable API is C++/C (see "Displays and Sound").
 
 ## Window
 
@@ -141,6 +141,50 @@ the page, and a result that comes back after the page is gone is dropped.
   processor, the memory and the graphics are read from `/usr/lib/os-release`,
   `/proc` and `/sys` and the PCI ID database, capped and made safe to show
   (`settings_sys::sysinfo`); nothing privileged.
+
+## Displays and Sound
+
+Both are QML pages over a small C++ QObject made by `PageBackends` when the
+page is shown and gone with it; the logic that needs no screen or sound
+server is in plain Qt files that Qt Test covers (`apps/atlas-settings/tests`,
+run with `ctest`).
+
+- **Displays** reads and sets the screens through libkscreen
+  (`cpp/screenconfig.cpp`: `GetConfigOperation`, `SetConfigOperation`; KWin's
+  output management on Wayland), as Plasma 6.7's Display Configuration does:
+  scale from 50 % to 300 % in 5 % steps (every step is exact in 1/120, the
+  Wayland fractional-scale unit), the mode kept at the same refresh rate when
+  the new resolution has it and the fastest otherwise, rotation as its four
+  turns, HDR and wide colour gamut together, the main screen as priority 1.
+  The screens must touch along an edge and never overlap; a drag snaps to the
+  nearest edge (`cpp/displaylogic.cpp`) and positions start at 0, 0.
+  Resolution, scale, rate, rotation, HDR and arrangement ask "Keep these
+  settings?" for 15 s and put the earlier settings back when nobody answers,
+  or when Settings closes with the question open; making a screen the main
+  one doesn't ask. Scale is applied when the slider is let go. Night Light is
+  `kwinrc [NightColor]` (`Active`, `Mode` 0 or 1, `NightTemperature`) through
+  KConfig, which KWin watches, with `org.kde.KWin.NightLight` asked
+  asynchronously for whether it works and to preview a temperature while the
+  slider moves (`cpp/nightlight.cpp`). The schedule is Plasma's "Sunrise and
+  sunset" (Dark-Light schedule, set in Plasma's Night Time page) or all day.
+  A screen's name is its vendor and model (the connector's name when it has
+  none), shown as plain text.
+- **Sound** talks to the PulseAudio API on PipeWire through PulseAudioQt
+  (`cpp/soundmixer.cpp`), which Plasma uses too, on the GUI thread's event
+  loop. Nothing is applied: every slider is live and the server tells the
+  page about changes from anywhere. The lists leave out virtual devices (but
+  not the default one), monitors of outputs, streams that are paused or
+  virtual, and the system's own event sounds. App names and icons come from
+  the stream's properties, made safe to show (a theme icon name, never a
+  path).
+- **Testing without screens or sound.** `ATLAS_SETTINGS_FAKE_DISPLAYS=<json>`
+  (built with `ATLAS_SETTINGS_TEST_HOOKS`, on by default) gives Displays
+  libkscreen's Fake backend with the layout in that file
+  (`tests/fixtures/displays-two.json`: a 3840x2160 screen at 1.7x with an
+  upright 1920x1080 one); it is the only place Settings uses a private
+  libkscreen header. The Sound test (`soundmixer_test`) needs a private
+  PipeWire with null devices and skips without one
+  (`ATLAS_TEST_SOUND=private`). Neither touches the real screens or audio.
 
 ## Launch arguments and single instance
 

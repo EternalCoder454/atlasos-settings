@@ -39,7 +39,9 @@ AtlasWindow {
     // is made only while it is shown, and its backend with it.
     readonly property var nativePages: ({
             "time-language": timeLanguagePage,
-            "system": systemPage
+            "system": systemPage,
+            "displays": displaysPage,
+            "sound": soundPage
         })
 
     title: AtlasApp.name
@@ -279,6 +281,30 @@ AtlasWindow {
     Component {
         id: systemPage
         SystemPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: displaysPage
+        DisplaysPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: soundPage
+        SoundPage {
             entry: root.currentPage
             itemId: root.itemId
             pages: root.pages

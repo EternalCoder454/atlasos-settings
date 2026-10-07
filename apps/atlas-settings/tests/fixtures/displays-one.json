@@ -1,0 +1,82 @@
+{
+  "screen": {
+    "id": 1,
+    "maxSize": {
+      "width": 16384,
+      "height": 16384
+    },
+    "minSize": {
+      "width": 8,
+      "height": 8
+    },
+    "currentSize": {
+      "width": 3340,
+      "height": 1920
+    },
+    "maxActiveOutputsCount": 4
+  },
+  "outputs": [
+    {
+      "id": 1,
+      "name": "eDP-1",
+      "vendor": "",
+      "model": "",
+      "type": "LVDS",
+      "modes": [
+        {
+          "id": "1",
+          "name": "2880x1800@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 2880,
+            "height": 1800
+          }
+        },
+        {
+          "id": "2",
+          "name": "2880x1800@48.0",
+          "refreshRate": 48.0,
+          "size": {
+            "width": 2880,
+            "height": 1800
+          }
+        },
+        {
+          "id": "3",
+          "name": "1920x1200@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 1920,
+            "height": 1200
+          }
+        },
+        {
+          "id": "4",
+          "name": "1440x900@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 1440,
+            "height": 900
+          }
+        }
+      ],
+      "preferredModes": [
+        "1"
+      ],
+      "currentModeId": "1",
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "size": {
+        "width": 2880,
+        "height": 1800
+      },
+      "scale": 1.5,
+      "rotation": 1,
+      "connected": true,
+      "enabled": true,
+      "priority": 1
+    }
+  ]
+}
