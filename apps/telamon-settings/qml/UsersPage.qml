@@ -90,7 +90,7 @@ SettingsPage {
             Keys.onSpacePressed: pictureDialog.open()
             Keys.onReturnPressed: pictureDialog.open()
 
-            TelamonAvatar {
+            AccountAvatar {
                 anchors.fill: parent
                 size: pictureButton.size
                 name: page.sys ? page.sys.meRealName : ""
@@ -123,7 +123,8 @@ SettingsPage {
             Rectangle {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                width: Kirigami.Units.gridUnit * 1.8
+                // Whole, even pixels, so the symbol can sit on the exact middle.
+                width: Math.round(Kirigami.Units.gridUnit * 0.9) * 2
                 height: width
                 radius: width / 2
                 color: TelamonStyle.surfaceRaised
@@ -133,7 +134,7 @@ SettingsPage {
                 Symbol {
                     anchors.centerIn: parent
                     icon: Symbols.PhotoCamera
-                    size: parent.width * 0.55
+                    size: Math.round(parent.width * 0.275) * 2
                 }
             }
             HoverHandler {
@@ -248,7 +249,7 @@ SettingsPage {
                 subtitle: otherRow.modelData.name
                 value: page.accountType(otherRow.modelData.admin)
                 chevron: true
-                leading: TelamonAvatar {
+                leading: AccountAvatar {
                     name: otherRow.modelData.realName
                     source: page.pictureUrl(otherRow.modelData.picture)
                     size: Kirigami.Units.gridUnit * 2
@@ -544,7 +545,7 @@ SettingsPage {
             Layout.fillWidth: true
             spacing: Kirigami.Units.largeSpacing
 
-            TelamonAvatar {
+            AccountAvatar {
                 name: page.person.realName ?? ""
                 source: page.pictureUrl(page.person.picture ?? "")
                 size: Kirigami.Units.gridUnit * 3

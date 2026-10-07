@@ -113,6 +113,7 @@ qt_add_qml_module(telamon-settings-app
         qml/SettingsPage.qml
         qml/AdvancedSection.qml
         qml/KcmRow.qml
+        qml/AccountAvatar.qml
         qml/RelatedLinks.qml
         qml/TimeLanguagePage.qml
         qml/PickerSheet.qml

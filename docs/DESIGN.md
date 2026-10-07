@@ -353,8 +353,12 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   opens a sheet to make them an administrator or remove them, and the last
   row is Add User; with nobody else it says so). Advanced holds only the
   login screen's KCM. AccountsService for the users, with the signed-in user
-  found by uid. `SetPassword` takes a SHA-512 crypt(3) hash, made with libcrypt
-  and a random salt (`settings_sys::accounts::hash_password`): the clear
+  found by uid. Pictures are round: `TelamonAvatar` masks them with a GPU
+  effect, which this app's default CPU drawing cannot do (it shows them
+  square), so `qml/AccountAvatar.qml` crops them to a circle on a Canvas and
+  uses `TelamonAvatar` only for the initials. Framework gap: drop it when
+  `TelamonAvatar` rounds pictures on the software backend. `SetPassword`
+  takes a SHA-512 crypt(3) hash, made with libcrypt and a random salt (`settings_sys::accounts::hash_password`): the clear
   text is held for the call only (overwritten after) and is never logged.
   Calls that may ask for a password send the polkit interactive flag.
   Add User creates the user and sets the password, and removes the user
