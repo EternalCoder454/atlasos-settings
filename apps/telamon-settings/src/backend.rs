@@ -86,7 +86,7 @@ const MAX_RESULTS: usize = 50;
 pub struct BackendRust {}
 
 impl qobject::Backend {
-    pub fn activate(mut self: Pin<&mut Self>, args: &QStringList) {
+    pub fn activate(self: Pin<&mut Self>, args: &QStringList) {
         // parse() looks at MAX_ARGS and names a few past them; a flood
         // from another program isn't copied whole.
         let args: Vec<String> = args

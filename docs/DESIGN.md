@@ -509,6 +509,10 @@ the `Obsoletes:` does that in the same transaction. The subpackage installs:
    keep working (`StartupWMClass` is Settings' own, so a window groups with
    such a pin).
 
+System Settings' global shortcut, Meta+I (and the Tools key), moves to
+Settings: its desktop file carries `X-KDE-Shortcuts` and a copy is installed
+in `kglobalaccel/`, where Plasma reads default shortcuts.
+
 What goes with plasma-systemsettings: its KRunner plugin (the Launcher
 replaces KRunner), its category files (Other Plasma Settings groups by the
 KCMs' own metadata) and its zsh completion.

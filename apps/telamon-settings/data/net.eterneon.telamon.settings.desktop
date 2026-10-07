@@ -13,6 +13,8 @@ Keywords=settings;system settings;preferences;options;configuration;configure;co
 StartupNotify=true
 SingleMainWindow=true
 X-KDE-StartupNotify=true
+# System Settings' global shortcut, kept (kglobalaccel/ holds the copy Plasma reads).
+X-KDE-Shortcuts=Tools,Meta+I
 # The Launcher's deep links (ActivateAction) start it through the session bus
 # when it is not running (net.eterneon.telamon.settings.service).
 DBusActivatable=true

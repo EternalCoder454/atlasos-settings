@@ -187,13 +187,16 @@ QT_QPA_PLATFORM=offscreen %ctest
 desktop-file-validate %{buildroot}%{_datadir}/applications/net.eterneon.telamon.settings.desktop \
     %{buildroot}%{_datadir}/applications/net.eterneon.atlas.settings.desktop \
     %{buildroot}%{_datadir}/applications/systemsettings.desktop \
-    %{buildroot}%{_datadir}/applications/kdesystemsettings.desktop
+    %{buildroot}%{_datadir}/applications/kdesystemsettings.desktop \
+    %{buildroot}%{_datadir}/kglobalaccel/net.eterneon.telamon.settings.desktop
 # Settings is in the menu and the Launcher finds it; the stand-ins for System
 # Settings are hidden.
 if grep -q '^NoDisplay=true' %{buildroot}%{_datadir}/applications/net.eterneon.telamon.settings.desktop; then
     echo "net.eterneon.telamon.settings.desktop is still hidden" >&2
     exit 1
 fi
+# System Settings' Meta+I goes on with Settings (the copy Plasma reads is the same file).
+grep -qx 'X-KDE-Shortcuts=Tools,Meta+I' %{buildroot}%{_datadir}/kglobalaccel/net.eterneon.telamon.settings.desktop
 for f in systemsettings kdesystemsettings; do
     grep -qx 'NoDisplay=true' %{buildroot}%{_datadir}/applications/$f.desktop
     grep -qx 'Exec=telamon-settings' %{buildroot}%{_datadir}/applications/$f.desktop
@@ -218,6 +221,7 @@ appstream-util validate-relax --nonet \
 %{_bindir}/atlas-settings
 %{_datadir}/applications/net.eterneon.telamon.settings.desktop
 %{_datadir}/applications/net.eterneon.atlas.settings.desktop
+%{_datadir}/kglobalaccel/net.eterneon.telamon.settings.desktop
 %{_datadir}/dbus-1/services/net.eterneon.telamon.settings.service
 %dir %{_datadir}/telamon-settings
 %{_datadir}/telamon-settings/search-index.json
@@ -242,7 +246,7 @@ appstream-util validate-relax --nonet \
   settings module it has a page for and kcmshell6 for any other, and the
   hidden systemsettings.desktop and kdesystemsettings.desktop start
   Settings, so Plasma's KCMLauncher, the tray applets and old pins keep
-  working.
+  working. Settings takes over System Settings' global shortcut, Meta+I.
 
 * Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.3.1-1
 - The screen edge glow is asked for only while the OS image changes (an

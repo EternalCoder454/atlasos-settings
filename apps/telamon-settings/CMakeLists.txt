@@ -233,6 +233,10 @@ endif()
 install(TARGETS telamon-settings-app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES data/net.eterneon.telamon.settings.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+# Plasma's global shortcuts read X-KDE-Shortcuts from the copies here (System
+# Settings had Meta+I this way, in kglobalaccel/systemsettings.desktop).
+install(FILES data/net.eterneon.telamon.settings.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/kglobalaccel)
 install(FILES data/net.eterneon.telamon.settings.service
         DESTINATION ${CMAKE_INSTALL_DATADIR}/dbus-1/services)
 
