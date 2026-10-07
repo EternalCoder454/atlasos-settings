@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "atlas-settings"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "atlas-framework-ui",
  "cxx",
@@ -922,11 +922,11 @@ dependencies = [
 
 [[package]]
 name = "settings-registry"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "settings-sys"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "log",
  "zbus",

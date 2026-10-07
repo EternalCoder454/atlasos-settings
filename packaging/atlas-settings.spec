@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           atlas-settings
-Version:        0.1.0
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        Settings, the settings app of AtlasOS
 License:        MIT
@@ -134,5 +134,9 @@ appstream-util validate-relax --nonet \
 %config(noreplace) %{_sysconfdir}/dnf/protected.d/atlas-settings.conf
 
 %changelog
+* Tue Oct 06 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.1.1-1
+- A new icon of its own (a steel gear), without the purple tile.
+- atlas-framework 1.6.0.
+
 * Mon Oct 05 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.1.0-1
 - First package
