@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           telamon-settings
-Version:        0.3.0
+Version:        0.3.1
 Release:        1%{?dist}
 Summary:        Settings, the settings app of Telamon OS
 License:        MIT
@@ -171,6 +171,10 @@ appstream-util validate-relax --nonet \
 %config(noreplace) %{_sysconfdir}/dnf/protected.d/telamon-settings.conf
 
 %changelog
+* Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.3.1-1
+- The screen edge glow is asked for only while the OS image changes (an
+  update, a channel switch, a rollback), not for app or firmware updates.
+
 * Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.3.0-1
 - Renamed to Telamon Settings (telamon-settings, net.eterneon.telamon.settings),
   on Telamon.Ui 2.0.0. The old package name is obsoleted and provided;
