@@ -107,6 +107,8 @@ fn callers_land_on_their_page() {
             },
         ),
         ("kcm_users", page("users")),
+        // Updates is a page of its own (it was Telamon Updater's window).
+        ("kcm_updates", page("updates")),
         ("org.kde.systemsettings", Target::Home),
         // Kept on Plasma's KCM.
         ("kcm_device_automounter", Target::Kcm),

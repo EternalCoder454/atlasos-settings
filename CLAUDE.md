@@ -12,7 +12,7 @@ The plan and roadmap are the Atlas Notes notes "AtlasOS/Settings/Plan" and
 "AtlasOS/Settings/Roadmap".
 
 The stack, build and look are Atlas Monitor's
-(`~/Documents/Projects/Telamon OS/Telamon OS Monitor`). When in doubt, do what it
+(`~/Documents/Projects/AtlasOS/AtlasOS Monitor`). When in doubt, do what it
 does, except for what atlas-framework provides (startup, settings file,
 logging, crash reports), which Settings takes from there.
 
@@ -47,7 +47,7 @@ logging, crash reports), which Settings takes from there.
   `qt_thread().queue`.
 - **Telamon.Ui is the installed `telamon-ui` package** from atlas-framework
   (`~/Documents/Atlas Framework`, read-only from here). Never copy Telamon.Ui
-  controls into this repo: ask the "Telamon OS Framework" session. Use only API
+  controls into this repo: ask the "AtlasOS Framework" session. Use only API
   that exists at the pinned release (`fw-src/api/telamon-ui.api` at the tag,
   not "Since 1.5.0" members).
 - **The page registry is the one list.** Sidebar, search, deep links, the

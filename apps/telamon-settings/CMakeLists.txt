@@ -29,6 +29,10 @@ find_package(KF6Screen REQUIRED)
 # The installed apps (default apps, startup apps): KApplicationTrader.
 find_package(KF6Service REQUIRED)
 find_package(Corrosion REQUIRED)
+# The Updates page's Flatpak updates: telamon-framework-flatpak links
+# libflatpak and GLib into the Rust library.
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FLATPAK REQUIRED IMPORTED_TARGET flatpak gio-2.0)
 
 set(WORKSPACE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 
@@ -94,9 +98,13 @@ target_include_directories(telamon-settings-app PRIVATE "${TELAMON_UI_CRATE_DIR}
 
 # qmlcachegen compiles every QML file to C++ at build time; the app reads no
 # .qml from disk at run time.
+# dates.js only holds date helpers: qmllint has nothing to say about it
+set_source_files_properties(qml/dates.js PROPERTIES QT_QML_SKIP_QMLLINT TRUE)
 qt_add_qml_module(telamon-settings-app
     URI net.eterneon.telamon.settings
     VERSION 1.0
+    RESOURCES
+        qml/icons/update-arrow.svg
     QML_FILES
         qml/Main.qml
         qml/PendingPage.qml
@@ -109,6 +117,9 @@ qt_add_qml_module(telamon-settings-app
         qml/TimeLanguagePage.qml
         qml/PickerSheet.qml
         qml/SystemPage.qml
+        qml/UpdatesPage.qml
+        qml/CrashReportsSheet.qml
+        qml/dates.js
         qml/DisplaysPage.qml
         qml/ArrangementView.qml
         qml/SoundPage.qml
@@ -127,7 +138,7 @@ qt_add_qml_module(telamon-settings-app
 )
 
 target_link_libraries(telamon-settings-app PRIVATE
-    telamon_settings
+    telamon_settings PkgConfig::FLATPAK
     Qt6::Core Qt6::DBus Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
     KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore KF6::ConfigGui KF6::Service
     # crypt(3), for the password hash AccountsService takes (settings-sys).

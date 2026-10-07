@@ -5,12 +5,14 @@
 mod apps_page;
 mod backend;
 mod bluetooth;
+mod crash_reports;
 mod network;
 mod power_page;
 mod privacy_page;
 mod support;
 mod system_info;
 mod time_language;
+mod updates_page;
 mod users_page;
 mod worker;
 
@@ -31,7 +33,8 @@ pub extern "C" fn telamon_backend_new() -> *mut c_void {
 }
 
 /// A page's backend, made when the page is shown (`cpp/pagebackends.cpp`):
-/// `time-language`, `system`, `power`, `users`, `privacy` or `apps`; null for
+/// `time-language`, `system`, `power`, `users`, `privacy`, `apps`, `updates`,
+/// `network`, `bluetooth` or `crash-reports`; null for
 /// any other kind. Ownership passes to
 /// the caller, which parents it to the page so it goes with it.
 ///
@@ -58,6 +61,12 @@ pub unsafe extern "C" fn telamon_page_backend_new(kind: *const c_char) -> *mut c
             .into_raw()
             .cast(),
         b"apps" => apps_page::qobject::apps_page_make_unique()
+            .into_raw()
+            .cast(),
+        b"crash-reports" => crash_reports::qobject::crash_reports_make_unique()
+            .into_raw()
+            .cast(),
+        b"updates" => updates_page::qobject::updates_page_make_unique()
             .into_raw()
             .cast(),
         b"system" => system_info::qobject::system_info_make_unique()

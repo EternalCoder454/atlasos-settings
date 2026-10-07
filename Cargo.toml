@@ -15,6 +15,9 @@ rust-version = "1.89"
 # here: it is the installed telamon-ui package.
 telamon-framework-ui = { git = "https://github.com/EternalCoder454/atlas-framework", tag = "v2.0.0" }
 log = { version = "0.4", features = ["std"] }
+# Telamon Updater's Qt-free code (the Updates page's logic), pinned to a revision
+# of atlasos-updater (CLAUDE.md, "Moving the telamon-updater-core pin").
+telamon-updater-core = { path = "/updater-src/crates/telamon-updater-core" }
 settings-registry = { path = "crates/settings-registry" }
 settings-sys = { path = "crates/settings-sys" }
 

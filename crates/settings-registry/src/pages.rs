@@ -70,7 +70,6 @@ pub static RENAMED: &[(&str, &str, Option<&str>)] = &[
     ("firewall", "privacy", Some("firewall")),
     ("datetime", "time-language", None),
     ("region", "time-language", Some("language")),
-    ("updates", "system", Some("updates")),
     ("about", "system", None),
 ];
 
@@ -466,6 +465,16 @@ pub static PAGES: &[Page] = &[
                 "Crash Reports",
                 &["crash", "bug reports", "telemetry"],
             ),
+            item(
+                "crash-review",
+                "Review Crash Reports",
+                &[
+                    "send crash report",
+                    "sent reports",
+                    "bug report",
+                    "stack trace",
+                ],
+            ),
             adv(
                 "firewall-rules",
                 "Allowed Apps and Ports",
@@ -615,17 +624,6 @@ pub static PAGES: &[Page] = &[
         items: &[
             item("device-name", "Device Name", &["hostname", "computer name"]),
             item(
-                "updates",
-                "Updates",
-                &[
-                    "upgrade",
-                    "software update",
-                    "atlas updater",
-                    "telamon updater",
-                    "bootc",
-                ],
-            ),
-            item(
                 "version",
                 "Telamon OS Version",
                 &["atlasos", "image", "bootc", "release"],
@@ -649,7 +647,77 @@ pub static PAGES: &[Page] = &[
                 &["kde", "kcm", "system settings", "more settings"],
             ),
         ],
-        related: &["time-language", "users", "privacy"],
+        related: &["updates", "time-language", "users", "privacy"],
+    },
+    Page {
+        id: "updates",
+        title: "Updates",
+        symbol: "SystemUpdateAlt",
+        kind: Kind::Native,
+        keywords: &[
+            "upgrade",
+            "software update",
+            "windows update",
+            "atlas updater",
+            "telamon updater",
+            "bootc",
+            "restart to update",
+        ],
+        items: &[
+            item(
+                "check",
+                "Check for Updates",
+                &[
+                    "refresh",
+                    "download update",
+                    "install update",
+                    "restart to update",
+                    "new version",
+                ],
+            ),
+            item(
+                "notes",
+                "What's New",
+                &["release notes", "what changed", "new features"],
+            ),
+            item(
+                "apps",
+                "App Updates",
+                &["flatpak", "update apps", "app store", "software"],
+            ),
+            item(
+                "firmware",
+                "Firmware Updates",
+                &["fwupd", "bios", "uefi", "device firmware", "lvfs"],
+            ),
+            adv(
+                "go-back",
+                "Go Back to the Previous Version",
+                &[
+                    "rollback",
+                    "undo update",
+                    "revert",
+                    "downgrade",
+                    "previous version",
+                ],
+            ),
+            adv(
+                "channel",
+                "Update Channel",
+                &["stable", "testing", "beta", "early access"],
+            ),
+            adv(
+                "automatic-apps",
+                "Update Apps in the Background",
+                &["automatic", "background updates", "auto update", "flatpak"],
+            ),
+            adv(
+                "history",
+                "Update History",
+                &["changelog", "versions", "what changed", "installed updates"],
+            ),
+        ],
+        related: &["privacy", "system"],
     },
     // Not in the sidebar: System's "Other Plasma Settings" opens it, and
     // search and links can.

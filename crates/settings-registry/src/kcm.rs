@@ -53,7 +53,7 @@ pub static MAP: &[(&str, &str, Option<&str>)] = &[
     ("kcm_access", "accessibility", None),
     ("kcm_clock", "time-language", None),
     ("kcm_regionandlang", "time-language", Some("language")),
-    ("kcm_updates", "system", Some("updates")),
+    ("kcm_updates", "updates", None),
     ("kcm_about-distro", "system", None),
 ];
 

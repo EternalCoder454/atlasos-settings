@@ -10,9 +10,9 @@ them. The full plan and its reasons are the Atlas Notes note
 Settings replaces KDE System Settings on Telamon OS. Its pages do the work
 themselves through the system's services (NetworkManager, BlueZ, UPower,
 power-profiles-daemon, AccountsService, timedated, localed, hostnamed, the
-portal PermissionStore, KDE's session services). A few rows stay KDE's
-(Printers opens `kcm_printer_manager`), Updates opens Telamon Updater, and every
-other installed KCM is listed under Other Plasma Settings and opens in
+portal PermissionStore, KDE's session services, the system helper for
+updates). A few rows stay KDE's (Printers opens `kcm_printer_manager`), and
+every other installed KCM is listed under Other Plasma Settings and opens in
 `kcmshell6`.
 
 ## Pages: simple first
@@ -30,8 +30,9 @@ checks where it can:
 - **Few pages, named for what people do**, in one flat sidebar with no
   headings: Home, Network, Bluetooth & Devices, Displays, Sound, Keyboard &
   Mouse, Appearance, Notifications, Apps, Privacy & Security, Users, Power &
-  Battery, Accessibility, Time & Language, System. No junk drawer: System is
-  Updates and About only.
+  Battery, Accessibility, Time & Language, System, Updates. No junk drawer:
+  System is About only, and Updates is its own page, as in Windows, last in
+  the list.
 - **The common settings first.** A page shows at most six settings, with
   good defaults; the rest of what it covers folds into one Advanced section
   at its end ([`Item::advanced`]). There is no global "advanced mode".
@@ -48,7 +49,7 @@ checks where it can:
 - **A sidebar click always opens the page's top**, never a spot left from an
   earlier visit.
 - **Home is short and has no promotions:** quick toggles and status (Wi-Fi,
-  Bluetooth, Light or Dark, updates) and recently changed settings.
+  Bluetooth, Light or Dark) and recently changed settings.
 - Plain words, a different symbol for every page, and no Apply button.
 
 Page IDs of earlier versions still open where their settings went
@@ -72,8 +73,10 @@ takes over `systemsettings` (see "Entry points").
 - `apps/telamon-settings`: the CXX-Qt backend (`src/backend.rs`), one
   backend QObject per built page (`src/time_language.rs`,
   `src/system_info.rs`) and the worker-thread helper (`src/worker.rs`),
+  the Updates page's backend (`src/updates_page.rs`, over
+  telamon-updater-core, see "Updates"),
   `cpp/main.cpp` (Qt start, single instance, command line),
-  `cpp/launcher.cpp` (starts `kcmshell6` and Telamon Updater),
+  `cpp/launcher.cpp` (starts `kcmshell6`),
   `cpp/kcmcatalog.cpp` (the installed KCMs, through KPluginMetaData),
   `cpp/pagebackends.cpp` (makes a page's backends when it is shown),
   `cpp/localeconfig.cpp` (Plasma's `plasma-localerc`, through KConfig), the
@@ -361,8 +364,16 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   systemd says it runs, because a call would start it again. Allowed Apps
   and Ports are the runtime zone API for the zone in use, made permanent
   with `runtimeToPermanent`. Crash Reports are telamon-framework-system's
-  per-user setting (`~/.config/atlas/crash-reporting.toml`), saved with the
-  same call Updater uses, then Updater's tray is told to `Reload`.
+  per-user setting (`~/.config/telamon/crash-reporting.toml`; the old
+  `~/.config/atlas/` file is read until the new one exists), saved with the
+  same call Updater uses, then Telamon Updater's tray is told to `Reload`
+  (it collects the reports and says when one waits). "Review Crash Reports"
+  (a sheet, `src/crash_reports.rs`, the Crash Reports screens of Updater's old
+  window) lists the reports waiting with exactly the data that would be
+  sent, and sends one only when the person presses Send for it (the
+  framework's `crash::send`); Don't Send deletes it; the reports sent in the
+  last 90 days are listed below. Links come from the sheet's data only when
+  `https://`.
 - **Apps.** Default Apps are `~/.config/mimeapps.list` (`[Default
   Applications]`, `[Added Associations]`) for the file types a kind covers,
   chosen only among the apps KService offers for it; the terminal is
@@ -374,6 +385,63 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   differs from the app's metadata and the global override is written, other
   groups and keys are kept) and the portals' PermissionStore for
   background, camera, microphone and screen access.
+
+## Updates
+
+Updates is the page Telamon Updater's window was (Windows Update living in
+Settings, not beside it). The window is gone from the Updater repo; what is
+left there runs in the background: the tray (panel icon, schedule,
+notifications, background app rounds), the system helper and the screen
+glow. Settings uses the same code, not a copy of it: `telamon-updater-core`
+(the repository `atlasos-updater`, a git dependency pinned to a commit in
+`Cargo.toml`) holds the Qt-free logic (the system helper's client and
+progress parser from `telamon-update-engine`, the settings file, schedule,
+restart and locks from `telamon-updater-base`, Flatpak updates, firmware,
+release notes, history), and `src/updates_page.rs` is the QObject around it,
+the old window's backend without its crash report screens.
+
+- **The page**: the status on top (Telamon OS is up to date, an update is
+  available, downloading and installing with a bar, restart to finish) with
+  the one next step (Check for Updates, Download Update, Restart to Update,
+  Restart Tonight or at a time, Try Again); What's New (the release notes,
+  in a sheet); App Updates (Flatpak, with "Update Apps"); Firmware Updates
+  (only with fwupd); under Advanced Go Back to the Previous Version, Update
+  Channel (stable or testing), Update Apps in the Background, and Update
+  History (the versions this computer ran with their release notes, and the
+  app updates), each in a sheet. A link to Privacy & Security is where
+  crash reports are.
+- **The system helper** is the Updater package's (`telamon-system-helper`,
+  D-Bus name `net.eterneon.telamon.SystemHelper`, six methods and a
+  `Progress` property, polkit actions of its own). Settings adds no method,
+  helper or polkit action; every call asks polkit through the helper, which
+  keeps "no root helper of our own" true for Settings.
+- **The backend lives as long as the window**, not as long as the page
+  (`Main.qml` makes it on the first visit): an update, app update or firmware
+  install that runs while another page is shown goes on and shows again when
+  the page does. Closing the window while the system is being changed
+  (`working`) only hides it; the program goes when that ends
+  (`cpp/main.cpp`, `keepRunning`). The first read of the page asks the
+  helper (D-Bus activated), so a visit to another page never starts it.
+- **The glow** ("the system is being changed") belongs to Telamon Updater's
+  tray, which starts `telamon-updater-glow`, the one program that draws it
+  around the edges of every screen. Settings tells the tray when `working`
+  starts and ends (`settings_sys::updater::set_working`, the tray's
+  `SetWorking` on the session bus; the tray forgets it when Settings leaves
+  the bus, so a crash leaves no glow). An update, switch or go back that
+  outlives Settings is seen by the tray itself, from the helper's `Progress`
+  property.
+- **Links**: `telamon-settings updates` opens the page and `updates check`
+  opens it and starts a check (the tray's Check for Updates, the
+  notifications' actions); `kcm_updates` is the page; the System page's
+  related links lead to it.
+- **Fixtures**: `TELAMON_UPDATER_FIXTURES=<dir>` (a debug or `fixtures`
+  build; the states are in the Updater repo, `apps/telamon-updater/fixtures-states`
+  and are copied to `apps/telamon-settings/fixtures-states` for the smoke
+  runs) shows the page with a banner "Developer test data" and
+  never touches the helper, Flatpak, fwupd or the user's settings file.
+  `scripts/smoke-mock.sh updates` instead starts a mock helper
+  (python-dbusmock, `crates/settings-sys/tests/templates/system_helper.py`)
+  on the private bus.
 
 ## Launch arguments and single instance
 

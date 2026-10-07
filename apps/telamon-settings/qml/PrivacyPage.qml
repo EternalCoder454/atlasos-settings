@@ -153,7 +153,7 @@ SettingsPage {
 
     Section {
         Layout.fillWidth: true
-        footer: page.sys && page.sys.crashHasServer ? qsTr("When an app crashes, a report is saved that you can read. Nothing is sent unless you choose to send it in Telamon Updater, and sent reports are public on the Telamon OS GitHub project.") : qsTr("When an app crashes, a report is saved that you can read. No crash report server is set up on this computer, so reports can't be sent.")
+        footer: page.sys && page.sys.crashHasServer ? qsTr("When an app crashes, a report is saved that you can read. Nothing is sent unless you choose to send it, and sent reports are public on the Telamon OS GitHub project.") : qsTr("When an app crashes, a report is saved that you can read. No crash report server is set up on this computer, so reports can't be sent.")
 
         SectionRow {
             objectName: "crash-reports"
@@ -163,6 +163,14 @@ SettingsPage {
             switchChecked: page.sys !== null && page.sys.crashEnabled
             enabled: page.sys !== null && page.sys.loaded && !page.sys.busy
             onSwitchToggled: checked => page.sys.changeCrashReports(checked)
+        }
+        SectionRow {
+            objectName: "crash-review"
+            visible: page.sys !== null && page.sys.crashEnabled
+            title: qsTr("Review Crash Reports")
+            subtitle: !page.reports ? "" : (page.reports.count === 0 ? qsTr("None waiting") : (page.reports.count === 1 ? qsTr("1 report waiting for you to decide") : qsTr("%1 reports waiting for you to decide").arg(page.reports.count)))
+            chevron: true
+            onClicked: crashSheet.open()
         }
     }
 
@@ -187,6 +195,27 @@ SettingsPage {
     RelatedLinks {
         page: page
     }
+
+    // The crash reports waiting, and the ones sent (src/crash_reports.rs):
+    // made once the setting is on, looked at without collecting.
+    readonly property var reports: sys && sys.crashEnabled ? pageBackends.create("crash-reports", page) : null
+
+    CrashReportsSheet {
+        id: crashSheet
+        reports: page.reports
+    }
+    // `telamon-settings privacy crash-review` (Telamon Updater's notice that
+    // a crash report is waiting) opens the sheet once it can.
+    function openReview() {
+        if (itemId === "crash-review" && reports)
+            crashSheet.open();
+    }
+    onReportsChanged: {
+        if (reports)
+            reports.peek();
+        openReview();
+    }
+    onItemIdChanged: openReview()
 
     // Screen Lock.
     TelamonDialog {

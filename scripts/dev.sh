@@ -114,11 +114,19 @@ fi
 
 tty=()
 [ -t 0 ] && tty=(-it)
+# TELAMON_UPDATER_SRC=<a checkout of atlasos-updater>: mounted read-only at
+# /updater-src, for working on Settings and telamon-updater-core together
+# (a path dependency in Cargo.toml during that; the committed pin is a git
+# revision).
+extra=()
+if [ -n "${TELAMON_UPDATER_SRC:-}" ]; then
+    extra+=(-v "$(cd "$TELAMON_UPDATER_SRC" && pwd)":/updater-src:ro)
+fi
 # SELinux labelling is off for the container (label=disable) rather than
 # relabelling the mounts with :z or :Z, which would change the labels of the
 # repo and ~/.cache on the host.
 exec podman run --rm "${tty[@]}" --security-opt label=disable \
-    -v "$repo":/src -w /src \
+    -v "$repo":/src -w /src "${extra[@]}" \
     -v "$work":/work \
     -v telamon-cargo:/root/.cargo/registry \
     -v telamon-cargo-git:/root/.cargo/git \

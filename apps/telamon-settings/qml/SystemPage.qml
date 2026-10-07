@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import Telamon.Ui
 
-// System: the device's name (hostnamed), Updates (Telamon Updater), and what
+// System: the device's name (hostnamed) and what
 // the device is. Other Plasma Settings is a link under Advanced.
 SettingsPage {
     id: page
@@ -40,18 +40,6 @@ SettingsPage {
             busy: page.sys !== null && page.sys.busy
             enabled: page.sys !== null && page.sys.loaded
             onClicked: renameSheet.open()
-        }
-        SectionRow {
-            objectName: "updates"
-            title: qsTr("Updates")
-            subtitle: qsTr("Check for and install Telamon OS updates")
-            clickable: true
-            onClicked: page.run(["telamon-updater"])
-
-            Symbol {
-                icon: Symbols.OpenInNew
-                opacity: 0.6
-            }
         }
     }
 

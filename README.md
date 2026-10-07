@@ -1,10 +1,11 @@
 # Telamon Settings
 
 The settings app of [Telamon OS](https://github.com/EternalCoder454/AtlasOS). It
-replaces KDE System Settings with fifteen pages instead of dozens: Home,
+replaces KDE System Settings with sixteen pages instead of dozens: Home,
 Network, Bluetooth & Devices, Displays, Sound, Keyboard & Mouse, Appearance,
 Notifications, Apps, Privacy & Security, Users, Power & Battery,
-Accessibility, Time & Language and System.
+Accessibility, Time & Language, System and Updates (what Telamon Updater's
+window was).
 
 - One window, its pages down a sidebar. Each page shows the settings most
   people change; the rest fold under Advanced. Search finds every setting.

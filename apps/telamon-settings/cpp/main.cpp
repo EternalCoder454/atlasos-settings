@@ -21,8 +21,9 @@
 
 #include <memory>
 
-// Defined in src/lib.rs.
+// Defined in src/lib.rs and src/updates_page.rs.
 extern "C" void *telamon_backend_new();
+extern "C" void telamon_updates_flush();
 
 static void activate(QObject *backend, const QStringList &arguments)
 {
@@ -123,7 +124,23 @@ int main(int argc, char *argv[])
     legacy.registerOnSessionBus();
     activate(backend.get(), QCoreApplication::arguments());
 
+    // Closing the last window quits, unless an update is being staged or apps
+    // or firmware are being installed (Main.qml's keepRunning): then the
+    // window only hides, and Main.qml quits when that ends. The screen glow
+    // and the system helper's work don't depend on this window; apps and
+    // firmware are installed from this process.
+    app.setQuitOnLastWindowClosed(false);
+    auto *window = qobject_cast<QQuickWindow *>(engine->rootObjects().value(0));
+    auto quitIfIdle = [window, &app] {
+        if (window && !window->isVisible() && !window->property("keepRunning").toBool()) {
+            app.quit();
+        }
+    };
+    QObject::connect(&app, &QGuiApplication::lastWindowClosed, &app, quitIfIdle);
+
     const int code = app.exec();
     engine.reset();
+    // Notifications still being sent, and the tray told of the last change.
+    telamon_updates_flush();
     return code;
 }

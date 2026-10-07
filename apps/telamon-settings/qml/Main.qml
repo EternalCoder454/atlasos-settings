@@ -13,7 +13,7 @@ TelamonWindow {
     // Set from main.cpp through setInitialProperties().
     // The registry, search and launch arguments (src/backend.rs).
     required property var backend
-    // Starts kcmshell6 and Telamon Updater (cpp/launcher.h).
+    // Starts kcmshell6 (cpp/launcher.h).
     required property var launcher
     // The installed KCMs, for More Settings (cpp/kcmcatalog.h).
     required property var kcmCatalog
@@ -35,6 +35,33 @@ TelamonWindow {
     // The first page of a new install.
     readonly property string firstPage: "home"
 
+    // The Updates page's backend lives as long as this window, not as long
+    // as the page, so an update goes on while another page is shown
+    // (src/updates_page.rs). Made on the first visit: it asks the system
+    // helper for the state, which nothing else needs.
+    property var updatesBackend: null
+    // (A plain object holds it first: making it inside the page's binding
+    // must not change what that binding reads.)
+    readonly property var madeUpdates: ({
+            "backend": null
+        })
+    function updates(): var {
+        if (!madeUpdates.backend) {
+            madeUpdates.backend = pageBackends.create("updates", root);
+            madeUpdates.backend.start();
+            Qt.callLater(() => root.updatesBackend = madeUpdates.backend);
+        }
+        return madeUpdates.backend;
+    }
+    // An update that is being staged, or apps or firmware being installed,
+    // outlives the window: closing it only hides it (cpp/main.cpp quits
+    // when this is false and no window shows).
+    readonly property bool keepRunning: updatesBackend !== null && updatesBackend.working
+    onKeepRunningChanged: {
+        if (!keepRunning && !visible)
+            Qt.quit();
+    }
+
     // The pages that are built, by ID; any other shows PendingPage. A page
     // is made only while it is shown, and its backend with it.
     readonly property var nativePages: ({
@@ -52,7 +79,8 @@ TelamonWindow {
             "power": powerPage,
             "users": usersPage,
             "privacy": privacyPage,
-            "apps": appsPage
+            "apps": appsPage,
+            "updates": updatesPage
         })
 
     title: TelamonApp.name
@@ -284,6 +312,19 @@ TelamonWindow {
             itemId: root.itemId
             pages: root.pages
             pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: updatesPage
+        UpdatesPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            updates: root.updates()
             onOpenPage: (id, item) => root.openPage(id, item)
             onOpenKcm: name => root.openKcm(name, "")
             onRun: argv => root.run(argv)

@@ -13,5 +13,7 @@ fn main() {
         .file("src/system_info.rs")
         .file("src/network.rs")
         .file("src/bluetooth.rs")
+        .file("src/updates_page.rs")
+        .file("src/crash_reports.rs")
         .build();
 }

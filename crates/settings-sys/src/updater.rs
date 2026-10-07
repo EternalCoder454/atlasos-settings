@@ -36,3 +36,16 @@ pub fn reload_tray(bus: &Bus) -> Result<(), Error> {
         other => other,
     }
 }
+
+/// Tells the tray the system is being changed (an update, a channel switch
+/// or a go back being staged, apps or firmware being installed) or no longer
+/// is, so it draws the glow around the screens' edges, which lasts as long as
+/// that does whether Settings' window is open or not. The tray forgets it when
+/// the caller leaves the bus, so a crash leaves no glow behind. Only the new
+/// name has the method (an Updater from before the rename draws its own glow
+/// in its own window). Blocking, so for a worker thread.
+pub fn set_working(bus: &Bus, on: bool) -> Result<(), Error> {
+    let conn = bus.connect_with(LIMIT)?;
+    Proxy::new(&conn, NAME, PATH, NAME)?.call::<_, _, ()>("SetWorking", &(on,))?;
+    Ok(())
+}

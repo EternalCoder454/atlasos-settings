@@ -32,7 +32,7 @@ BuildRequires:  gcc-c++
 BuildRequires:  cmake
 BuildRequires:  ninja-build
 BuildRequires:  corrosion
-# Cargo fetches the atlas-framework crates from GitHub.
+# Cargo fetches the atlas-framework and atlasos-updater crates from GitHub.
 BuildRequires:  git-core
 BuildRequires:  desktop-file-utils
 BuildRequires:  libappstream-glib
@@ -57,6 +57,11 @@ BuildRequires:  cmake(KF6PulseAudioQt)
 BuildRequires:  cmake(KF6Service)
 # crypt(3), for the password hash AccountsService takes
 BuildRequires:  libxcrypt-devel
+# The Updates page's Flatpak updates (telamon-framework-flatpak, through
+# telamon-updater-core, link libflatpak).
+BuildRequires:  pkgconfig(flatpak)
+BuildRequires:  pkgconfig(glib-2.0)
+BuildRequires:  pkgconfig(gio-2.0)
 # QML modules qmlcachegen resolves at build time (not linked). telamon-ui comes
 # from atlas-framework, which is in no repository: install its RPMs first
 # (build-rpm.sh does, given TELAMON_LOCAL_RPMS).

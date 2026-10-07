@@ -5,7 +5,8 @@
 #   SMOKE_OUT=/work/smoke/<name> SMOKE_SCENARIO=laptop scripts/dev.sh scripts/smoke-mock.sh [app arguments]
 # Scenarios: desktop (default; no battery, no fingerprint reader) and laptop.
 # SMOKE_DARK=1 starts the app with the Telamon OS dark colour scheme.
-# SMOKE_SERVICES (default all): power accounts fprintd firewalld permissions apps.
+# SMOKE_SERVICES (default all but updates): power accounts fprintd firewalld permissions apps;
+# `updates` mocks the system helper (SMOKE_SERVICES=updates scripts/smoke-mock.sh updates).
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -147,8 +148,14 @@ MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;' firefox
         desktop Steam steam steam "Games" '' steam
         cp "$data/applications/steam.desktop" /work/smoke/xdg/config/autostart/steam.desktop
         cp "$data/applications/thunderbird.desktop" /work/smoke/xdg/config/autostart/thunderbird.desktop
-        printf '[Desktop Entry]\nType=Application\nName=Telamon Updater\nExec=atlas-updater-tray\nIcon=system-software-update\nComment=Checks for updates\n' >/work/smoke/xdg/config/autostart/net.eterneon.atlas.updater-tray.desktop
+        printf '[Desktop Entry]\nType=Application\nName=Telamon Updater\nExec=telamon-updater-tray\nIcon=system-software-update\nComment=Checks for updates\n' >/work/smoke/xdg/config/autostart/net.eterneon.telamon.updater-tray.desktop
         printf '[Default Applications]\nx-scheme-handler/https=brave.desktop;\nx-scheme-handler/http=brave.desktop;\ninode/directory=dolphin.desktop;\n' >/work/smoke/xdg/config/mimeapps.list
+        ;;
+    updates)
+        # The system helper of Telamon Updater, for the Updates page:
+        # SMOKE_UPDATES=uptodate|available|staged, SMOKE_UPDATES_HOLD=<seconds>
+        # an Upgrade takes (the page shows the helper's progress meanwhile).
+        mock "$templates/system_helper.py" net.eterneon.telamon.SystemHelper "{\"Scenario\": \"${SMOKE_UPDATES:-available}\", \"Hold\": ${SMOKE_UPDATES_HOLD:-0}}"
         ;;
     firewalld)
         mock "$templates/systemd1.py" org.freedesktop.systemd1
