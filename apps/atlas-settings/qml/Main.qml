@@ -39,7 +39,11 @@ AtlasWindow {
     // is made only while it is shown, and its backend with it.
     readonly property var nativePages: ({
             "time-language": timeLanguagePage,
-            "system": systemPage
+            "system": systemPage,
+            "appearance": appearancePage,
+            "input": inputPage,
+            "notifications": notificationsPage,
+            "accessibility": accessibilityPage
         })
 
     title: AtlasApp.name
@@ -279,6 +283,54 @@ AtlasWindow {
     Component {
         id: systemPage
         SystemPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: appearancePage
+        AppearancePage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: inputPage
+        InputPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: notificationsPage
+        NotificationsPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: accessibilityPage
+        AccessibilityPage {
             entry: root.currentPage
             itemId: root.itemId
             pages: root.pages

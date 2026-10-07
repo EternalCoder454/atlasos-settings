@@ -1,6 +1,10 @@
 #include "pagebackends.h"
 
+#include "accessibilityconfig.h"
+#include "appearanceconfig.h"
+#include "inputconfig.h"
 #include "localeconfig.h"
+#include "notificationsconfig.h"
 
 #include <QDebug>
 #include <QQmlEngine>
@@ -13,6 +17,14 @@ QObject *PageBackends::create(const QString &kind, QObject *parent)
     QObject *object = nullptr;
     if (kind == QLatin1String("locale-config")) {
         object = new LocaleConfig;
+    } else if (kind == QLatin1String("appearance")) {
+        object = new AppearanceConfig;
+    } else if (kind == QLatin1String("input")) {
+        object = new InputConfig;
+    } else if (kind == QLatin1String("notifications")) {
+        object = new NotificationsConfig;
+    } else if (kind == QLatin1String("accessibility")) {
+        object = new AccessibilityConfig;
     } else {
         object = static_cast<QObject *>(atlas_page_backend_new(kind.toUtf8().constData()));
     }
