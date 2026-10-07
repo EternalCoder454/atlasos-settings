@@ -265,6 +265,29 @@ backend starts one itself. Tests (`tests/pageconfig_test.cpp`, `ctest`) read
 every write back from a temporary `$XDG_CONFIG_HOME` and run the KWin and
 Plasma shell calls against fakes (`tests/fakes.h`) on a private session bus.
 
+- **The desktop preview** tops the page: a 16:10 picture of the Telamon OS
+  desktop (`qml/DesktopPreview.qml`) that follows Light or Dark, the accent,
+  the wallpaper, transparency and the dock, and previews a Light or Dark card
+  or an accent swatch while the pointer or the keyboard focus is on it (a note
+  under it says so). It is never a control, and shows nothing of the user's
+  but the wallpaper: the window is made up, the dock holds generic theme icons
+  and the bar's islands are bare shapes. The colours are the ones TelamonStyle
+  derives from the TelamonLight and TelamonDark schemes, whichever scheme the
+  app is in. Translucent means `Appearance.effective` (the switch on and the
+  compositor's blur available): the window, bar and dock then show a blurred
+  copy of the wallpaper (a `MultiEffect`; none under software rendering, where
+  they are only tinted). The wallpaper is `read()`'s `wallpaper.picture` (and
+  `pictureDark`, which Plasma shows with a dark scheme): the main screen's
+  (`lastScreen=0`) image of the applets file, a package's largest image up to
+  2560 wide, Telamon OS's own wallpaper when none is set (and, until the image
+  has loaded, the cherry tree's colours drawn as shapes); it is decoded at the
+  size shown. A wallpaper just chosen shows at once and until Plasma has saved
+  it (it does so some seconds later; `AppearanceConfig` watches the applets
+  file). Colours fade over `TelamonStyle.durationShort`, which is 0 under
+  reduced motion. `DesktopPreview` started as Telamon Setup's
+  `WizardThemePreview` and is a candidate for Telamon.Ui (with the wallpaper,
+  dock and blur as options): ask the framework session before a second app
+  copies it.
 - **Light or Dark** runs `plasma-apply-colorscheme AtlasOSLight|AtlasOSDark`
   (with `--accent-color` when an accent is set), which writes `[General]
   ColorScheme` into the user's kdeglobals and announces it: the keys

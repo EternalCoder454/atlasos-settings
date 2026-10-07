@@ -207,6 +207,7 @@ Item {
                     sourceItem: scene._wall
                     sourceRect: Qt.rect(glass.gx, glass.gy, glass.gw, glass.gh)
                 }
+                autoPaddingEnabled: false
                 blurEnabled: true
                 blurMax: 32
                 blur: Math.min(1, Math.max(0.05, scene.width / 2000))
