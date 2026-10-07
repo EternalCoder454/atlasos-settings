@@ -497,21 +497,42 @@ pub static PAGES: &[Page] = &[
     },
     Page {
         id: "users",
-        title: "Users",
+        title: "Accounts",
         symbol: "Group",
         kind: Kind::Native,
-        keywords: &["account", "accounts", "login", "accountsservice"],
+        keywords: &[
+            "account",
+            "accounts",
+            "your info",
+            "profile",
+            "users",
+            "family",
+            "login",
+            "accountsservice",
+        ],
         items: &[
-            item("name", "Full Name", &["display name"]),
-            item("picture", "Profile Picture", &["avatar", "photo"]),
+            item(
+                "name",
+                "Full Name",
+                &["display name", "edit name", "your info"],
+            ),
+            item(
+                "picture",
+                "Profile Picture",
+                &["avatar", "photo", "change picture"],
+            ),
             item("password", "Password", &["change password", "sign in"]),
             item(
                 "fingerprint",
                 "Fingerprint",
                 &["fprintd", "biometric", "enroll", "enrol"],
             ),
-            item("add-user", "Add User", &["new account", "family"]),
-            adv("auto-login", "Automatic Login", &["autologin", "sign in"]),
+            item("auto-login", "Automatic Login", &["autologin", "sign in"]),
+            item(
+                "add-user",
+                "Add User",
+                &["new account", "family", "other users", "new user"],
+            ),
             adv_kcm(
                 "login-screen",
                 "Login Screen",

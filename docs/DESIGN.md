@@ -29,7 +29,7 @@ checks where it can:
 
 - **Few pages, named for what people do**, in one flat sidebar with no
   headings: Home, Network, Bluetooth & Devices, Displays, Sound, Keyboard &
-  Mouse, Appearance, Notifications, Apps, Privacy & Security, Users, Power &
+  Mouse, Appearance, Notifications, Apps, Privacy & Security, Accounts, Power &
   Battery, Accessibility, Time & Language, System, Updates. No junk drawer:
   System is About only, and Updates is its own page, as in Windows, last in
   the list.
@@ -324,7 +324,7 @@ Plasma shell calls against fakes (`tests/fakes.h`) on a private session bus.
   **Sticky Keys** and the other helps are kaccessrc `[Keyboard]` and
   `[Mouse]`.
 
-## Power & Battery, Users, Privacy & Security and Apps
+## Power & Battery, Accounts, Privacy & Security and Apps
 
 Each page's system calls are `settings-sys` clients tested against
 python-dbusmock (templates for the services it has none for are in
@@ -345,9 +345,20 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   notification, then PowerDevil's `reparseConfiguration`. A computer with
   a battery writes both profiles. Defaults for keys the file doesn't have
   are PowerDevil's (`cpp/powerconfig.cpp`).
-- **Users.** AccountsService for the users, with the signed-in user found
-  by uid. `SetPassword` takes a SHA-512 crypt(3) hash, made with libcrypt
-  and a random salt (`settings_sys::accounts::hash_password`): the clear
+- **Accounts** (page ID `users`, so links and searches for Users still land
+  on it). It reads as your account first: a header with your picture (tap it
+  to change it), full name, "user name · Administrator" and the buttons
+  Change Picture and Edit Name; then Sign-In Options (Password, Fingerprint
+  when there is a reader, Automatic Login); then Other Users (each person
+  opens a sheet to make them an administrator or remove them, and the last
+  row is Add User; with nobody else it says so). Advanced holds only the
+  login screen's KCM. AccountsService for the users, with the signed-in user
+  found by uid. Pictures are round: `TelamonAvatar` masks them with a GPU
+  effect, which this app's default CPU drawing cannot do (it shows them
+  square), so `qml/AccountAvatar.qml` crops them to a circle on a Canvas and
+  uses `TelamonAvatar` only for the initials. Framework gap: drop it when
+  `TelamonAvatar` rounds pictures on the software backend. `SetPassword`
+  takes a SHA-512 crypt(3) hash, made with libcrypt and a random salt (`settings_sys::accounts::hash_password`): the clear
   text is held for the call only (overwritten after) and is never logged.
   Calls that may ask for a password send the polkit interactive flag.
   Add User creates the user and sets the password, and removes the user

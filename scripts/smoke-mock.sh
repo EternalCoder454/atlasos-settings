@@ -4,6 +4,12 @@
 # without touching the machine's own services. Inside the dev container:
 #   SMOKE_OUT=/work/smoke/<name> SMOKE_SCENARIO=laptop scripts/dev.sh scripts/smoke-mock.sh [app arguments]
 # Scenarios: desktop (default; no battery, no fingerprint reader) and laptop.
+# SMOKE_ACCOUNTS=<JSON list of users> replaces the accounts mock's users
+# ({Uid, UserName, RealName, IconFile, AccountType (1 = administrator),
+# AutomaticLogin}; Uid 0 is you), e.g. only you:
+#   SMOKE_ACCOUNTS='[{"Uid": 0, "UserName": "ada", "RealName": "Ada Lovelace", "AccountType": 1}]'
+# Pictures to point IconFile at are made in /work/smoke/pics (ada.png, grace.png).
+# SMOKE_XDO="mousemove X Y click 1 sleep 1" opens a sheet before the screenshot.
 # SMOKE_DARK=1 starts the app with the Telamon OS dark colour scheme.
 # SMOKE_SERVICES (default all but updates): power accounts fprintd firewalld permissions apps;
 # `updates` mocks the system helper (SMOKE_SERVICES=updates scripts/smoke-mock.sh updates).
@@ -91,11 +97,21 @@ m.AddProperty("org.freedesktop.UPower.Device", "ChargeThresholdEnabled", False)
         fi
         ;;
     accounts)
-        # The smoke run is root in the container: that is "you".
-        mock "$templates/accounts_service.py" org.freedesktop.Accounts '{"Users": [
+        # The smoke run is root in the container: that is "you" (Uid 0).
+        # Pictures for IconFile: /work/smoke/pics/ada.png and grace.png.
+        pics=/work/smoke/pics
+        mkdir -p "$pics"
+        if [ ! -f "$pics/ada.png" ]; then
+            im=convert
+            command -v magick >/dev/null && im=magick
+            "$im" -size 256x256 gradient:'#7a4cc2-#1f6fbf' "$pics/ada.png"
+            "$im" -size 256x256 gradient:'#e0a030-#b02a61' "$pics/grace.png"
+        fi
+        users=${SMOKE_ACCOUNTS:-'[
             {"Uid": 0, "UserName": "ada", "RealName": "Ada Lovelace", "AccountType": 1},
             {"Uid": 1001, "UserName": "grace", "RealName": "Grace Hopper", "AccountType": 1},
-            {"Uid": 1002, "UserName": "kit", "RealName": "Kit Marlowe"}]}'
+            {"Uid": 1002, "UserName": "kit", "RealName": "Kit Marlowe"}]'}
+        mock "$templates/accounts_service.py" org.freedesktop.Accounts "{\"Users\": $users}"
         ;;
     permissions)
         # Flatpak apps (fixtures in the smoke run's XDG_DATA_HOME), and the
