@@ -131,6 +131,40 @@ impl MockBus {
         self.wait_for(name);
     }
 
+    /// Starts one of this crate's own templates (`tests/templates/<name>.py`),
+    /// for services python-dbusmock has none for.
+    pub fn local_template(&mut self, template: &str, params: Option<&str>, name: &str) {
+        let path = format!(
+            "{}/tests/templates/{template}.py",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        self.template(&path, params, name);
+    }
+
+    /// Adds a method to a mocked object through dbusmock's own interface:
+    /// `code` is the Python that answers it (`ret = ...`).
+    pub fn add_method(
+        &self,
+        name: &str,
+        path: &str,
+        iface: &str,
+        method: &str,
+        sigs: (&str, &str),
+        code: &str,
+    ) {
+        let conn = zbus::blocking::connection::Builder::address(self.address.as_str())
+            .and_then(|b| b.build())
+            .expect("connect to the test bus");
+        conn.call_method(
+            Some(name),
+            path,
+            Some("org.freedesktop.DBus.Mock"),
+            "AddMethod",
+            &(iface, method, sigs.0, sigs.1, code),
+        )
+        .expect("AddMethod");
+    }
+
     fn wait_for(&self, name: &str) {
         let conn = zbus::blocking::connection::Builder::address(self.address.as_str())
             .and_then(|b| b.build())

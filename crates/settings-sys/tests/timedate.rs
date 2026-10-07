@@ -32,6 +32,28 @@ fn reads_and_changes_the_time_zone() {
 }
 
 #[test]
+fn lists_valid_time_zones_sorted() {
+    let Some(mut bus) = common::MockBus::start() else {
+        return;
+    };
+    bus.template("timedated", None, "org.freedesktop.timedate1");
+    // The template has no ListTimezones; this one answers with junk mixed in.
+    bus.add_method(
+        "org.freedesktop.timedate1",
+        "/org/freedesktop/timedate1",
+        "org.freedesktop.timedate1",
+        "ListTimezones",
+        ("", "as"),
+        r#"ret = ["UTC", "Europe/Berlin", "../etc/passwd", "America/New_York", "Europe/Berlin", "a\x1bb"]"#,
+    );
+    let td = Timedate::new(&bus.bus()).expect("connect");
+    assert_eq!(
+        td.timezones().expect("timezones"),
+        ["America/New_York", "Europe/Berlin", "UTC"]
+    );
+}
+
+#[test]
 fn a_missing_service_says_so() {
     let Some(bus) = common::MockBus::start() else {
         return;

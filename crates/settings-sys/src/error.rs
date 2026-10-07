@@ -29,7 +29,7 @@ pub const MAX_DETAIL: usize = 200;
 
 /// Format characters (Unicode category Cf and line/paragraph separators) that
 /// can reorder or hide text: bidi overrides, zero-width marks, tags.
-fn is_invisible(c: char) -> bool {
+pub(crate) fn is_invisible(c: char) -> bool {
     matches!(c,
         '\u{00AD}' | '\u{061C}' | '\u{180E}' | '\u{200B}'..='\u{200F}'
         | '\u{2028}'..='\u{202E}' | '\u{2060}'..='\u{206F}' | '\u{FEFF}'
@@ -39,9 +39,16 @@ fn is_invisible(c: char) -> bool {
 /// D-Bus text is untrusted: cap it and replace control and invisible format
 /// characters with U+FFFD before it reaches a log or a page.
 fn sanitize(s: &str) -> String {
+    clean(s, MAX_DETAIL)
+}
+
+/// Untrusted text (a D-Bus reply, a file under /proc) made safe to show:
+/// at most `max` characters, then an ellipsis, control and invisible format
+/// characters replaced with U+FFFD.
+pub fn clean(s: &str, max: usize) -> String {
     let mut out = String::new();
     for (n, c) in s.chars().enumerate() {
-        if n == MAX_DETAIL {
+        if n == max {
             out.push('\u{2026}');
             break;
         }

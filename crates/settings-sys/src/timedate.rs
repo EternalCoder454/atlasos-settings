@@ -27,6 +27,7 @@ trait Timedate {
     fn set_timezone(&self, timezone: &str, interactive: bool) -> zbus::Result<()>;
     #[zbus(name = "SetNTP")]
     fn set_ntp(&self, use_ntp: bool, interactive: bool) -> zbus::Result<()>;
+    fn list_timezones(&self) -> zbus::Result<Vec<String>>;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,6 +44,9 @@ pub struct Status {
 
 /// The longest time zone name accepted (the longest IANA name is 32).
 pub const MAX_TIMEZONE: usize = 64;
+
+/// Most time zones read from timedated (the database has about 600).
+pub const MAX_TIMEZONES: usize = 2000;
 
 /// Whether `tz` looks like an IANA time zone name. timedated checks it
 /// against the zone database too; this keeps junk off the bus.
@@ -88,6 +92,19 @@ impl Timedate {
             ntp: p.ntp()?,
             ntp_synchronized: p.ntp_synchronized()?,
         })
+    }
+
+    /// The time zones timedated accepts, sorted, invalid names left out.
+    pub fn timezones(&self) -> Result<Vec<String>, Error> {
+        let mut zones: Vec<String> = TimedateProxy::new(&self.conn)?
+            .list_timezones()?
+            .into_iter()
+            .filter(|z| valid_timezone(z))
+            .take(MAX_TIMEZONES)
+            .collect();
+        zones.sort();
+        zones.dedup();
+        Ok(zones)
     }
 
     /// Sets the time zone; polkit may ask for a password.

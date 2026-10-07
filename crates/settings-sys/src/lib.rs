@@ -8,10 +8,13 @@
 //! plain-words description.
 //!
 //! The tests run each client against python-dbusmock's model of the service
-//! on a private bus (`tests/mockbus.rs`), never the machine's own services.
+//! on a private bus (`tests/common`), never the machine's own services.
 
 pub mod bus;
 pub mod error;
+pub mod hostname;
+pub mod locale;
+pub mod sysinfo;
 pub mod timedate;
 
 pub use bus::Bus;
