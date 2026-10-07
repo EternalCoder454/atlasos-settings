@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           atlas-settings
-Version:        0.1.1
+Version:        0.2.0
 Release:        1%{?dist}
 Summary:        Settings, the settings app of AtlasOS
 License:        MIT
@@ -150,6 +150,18 @@ appstream-util validate-relax --nonet \
 %config(noreplace) %{_sysconfdir}/dnf/protected.d/atlas-settings.conf
 
 %changelog
+* Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.2.0-1
+- Fifteen pages instead of System Settings' dozens: Home, Network,
+  Bluetooth & Devices, Displays, Sound, Keyboard & Mouse, Appearance,
+  Notifications, Apps, Privacy & Security, Users, Power & Battery,
+  Accessibility, Time & Language and System. Each shows the settings most
+  people change; the rest fold under Advanced, and search finds them all.
+- Every page is Settings' own, through the system's services
+  (NetworkManager, BlueZ, libkscreen, PipeWire, AccountsService, firewalld,
+  power-profiles-daemon, timedated and others); rarely used Plasma pages
+  open from rows that say so, or from Other Plasma Settings.
+- Still hidden from the menu until it replaces System Settings.
+
 * Tue Oct 06 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.1.1-1
 - A new icon of its own (a steel gear), without the purple tile.
 - atlas-framework 1.6.0.
