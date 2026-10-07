@@ -45,6 +45,10 @@ AtlasWindow {
             "devices": devicesPage,
             "displays": displaysPage,
             "sound": soundPage,
+            "appearance": appearancePage,
+            "input": inputPage,
+            "notifications": notificationsPage,
+            "accessibility": accessibilityPage,
             "power": powerPage,
             "users": usersPage,
             "privacy": privacyPage,
@@ -348,6 +352,54 @@ AtlasWindow {
     Component {
         id: soundPage
         SoundPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: appearancePage
+        AppearancePage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: inputPage
+        InputPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: notificationsPage
+        NotificationsPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: accessibilityPage
+        AccessibilityPage {
             entry: root.currentPage
             itemId: root.itemId
             pages: root.pages

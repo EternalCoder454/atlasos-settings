@@ -7,7 +7,9 @@
 // from src/lib.rs (atlas_page_backend_new); `locale-config` is the KConfig
 // side of Time & Language (localeconfig.h); `color-scheme` is Home's Light or
 // Dark switch (colorscheme.h); `displays` and `night-light` are Displays'
-// (screenconfig.h, nightlight.h), `sound` is Sound's (soundmixer.h).
+// (screenconfig.h, nightlight.h), `sound` is Sound's (soundmixer.h);
+// `appearance`, `input`, `notifications` and `accessibility` are the KConfig
+// and KWin side of those pages (appearanceconfig.h and the like).
 class PageBackends : public QObject
 {
     Q_OBJECT

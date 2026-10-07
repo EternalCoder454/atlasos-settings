@@ -9,7 +9,7 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX /usr CACHE PATH "" FORCE)
 endif()
 include(GNUInstallDirs)
-find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Widgets)
+find_package(Qt6 6.11 REQUIRED COMPONENTS Core DBus Gui Qml Quick QuickControls2 Widgets)
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 # atlas-framework-ui's startup code (single instance, window activation);
@@ -79,11 +79,15 @@ qt_add_executable(atlas-settings-app
     cpp/kcmcatalog.cpp
     cpp/localeconfig.cpp
     cpp/colorscheme.cpp
+    cpp/pagebackends.cpp
+    cpp/appearanceconfig.cpp
+    cpp/inputconfig.cpp
+    cpp/notificationsconfig.cpp
+    cpp/accessibilityconfig.cpp
     cpp/powerconfig.cpp
     cpp/screenlockconfig.cpp
     cpp/autostartconfig.cpp
-    cpp/defaultapps.cpp
-    cpp/pagebackends.cpp)
+    cpp/defaultapps.cpp)
 set_target_properties(atlas-settings-app PROPERTIES OUTPUT_NAME atlas-settings)
 target_include_directories(atlas-settings-app PRIVATE "${ATLAS_UI_CRATE_DIR}/include")
 
@@ -110,6 +114,10 @@ qt_add_qml_module(atlas-settings-app
         qml/NetworkPage.qml
         qml/DevicesPage.qml
         qml/HomePage.qml
+        qml/AppearancePage.qml
+        qml/InputPage.qml
+        qml/NotificationsPage.qml
+        qml/AccessibilityPage.qml
         qml/PowerPage.qml
         qml/UsersPage.qml
         qml/PrivacyPage.qml
@@ -119,10 +127,38 @@ qt_add_qml_module(atlas-settings-app
 
 target_link_libraries(atlas-settings-app PRIVATE
     atlas_settings
-    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore KF6::Service
+    Qt6::Core Qt6::DBus Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
+    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore KF6::ConfigGui KF6::Service
     # crypt(3), for the password hash AccountsService takes (settings-sys).
     crypt)
+
+# Tests of the page backends that write Plasma's settings: against a temporary
+# config folder and fake KWin and Plasma shell services on a private session
+# bus (dbus-run-session). `ctest --test-dir <build>`.
+include(CTest)
+if(BUILD_TESTING)
+    find_package(Qt6 6.11 REQUIRED COMPONENTS Test)
+    find_program(DBUS_RUN_SESSION dbus-run-session)
+    add_executable(pageconfig_test
+        tests/pageconfig_test.cpp
+        tests/fakes.h
+        cpp/appearanceconfig.cpp
+        cpp/inputconfig.cpp
+        cpp/notificationsconfig.cpp
+        cpp/accessibilityconfig.cpp)
+    target_include_directories(pageconfig_test PRIVATE cpp)
+    target_link_libraries(pageconfig_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui Qt6::Test KF6::ConfigCore KF6::ConfigGui)
+    set_target_properties(pageconfig_test PROPERTIES AUTOMOC ON)
+    # Stands in for KWin and Plasma's shell in the smoke runs (never installed).
+    add_executable(fake_desktop tests/fake_desktop.cpp tests/fakes.h)
+    target_link_libraries(fake_desktop PRIVATE Qt6::Core Qt6::DBus)
+    set_target_properties(fake_desktop PROPERTIES AUTOMOC ON)
+    if(DBUS_RUN_SESSION)
+        add_test(NAME pageconfig COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:pageconfig_test>)
+    else()
+        add_test(NAME pageconfig COMMAND pageconfig_test)
+    endif()
+endif()
 
 # Displays' C++: the screens (libkscreen) and Night Light (kwinrc). A library
 # of its own so the tests link what the app links.
