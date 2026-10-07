@@ -89,8 +89,8 @@ takes over `systemsettings` (see "Entry points").
   (the registry's `related` pages) and `PickerSheet` (a searchable list in
   a sheet). `Main.qml` maps page IDs to their components (`nativePages`);
   any other page shows `PendingPage`.
-- Later: Displays (libkscreen) and the PipeWire side of Sound (libpulse) in
-  C++, because their only stable API is C++/C; decided by spikes S1 and S2.
+- Displays (libkscreen) and the PipeWire side of Sound (PulseAudioQt) are in
+  C++, because their only stable API is C++/C (see "Displays and Sound").
 
 ## Window
 
@@ -143,6 +143,105 @@ the page, and a result that comes back after the page is gone is dropped.
   processor, the memory and the graphics are read from `/usr/lib/os-release`,
   `/proc` and `/sys` and the PCI ID database, capped and made safe to show
   (`settings_sys::sysinfo`); nothing privileged.
+
+## Network, Bluetooth & Devices and Home
+
+- **Network** is NetworkManager's, through `settings_sys::network`: Wi-Fi on
+  or off (`WirelessEnabled`), the networks in range (one row per name, the
+  strongest access point; the one in use first, then the saved ones), wired
+  status, VPN connections (`vpn` and `wireguard` profiles, connected and
+  disconnected from the row), the hotspot and airplane mode. A network opens
+  in a sheet (status, signal, security; Join with a password, Connect,
+  Disconnect, Forget); a new password goes to NetworkManager in the
+  `AddAndActivateConnection` call and is never stored or logged
+  (`network::Secret` hides it from `Debug` and overwrites it when dropped). A
+  network that doesn't come up within 30 s, or is refused, is not kept. WPA,
+  WPA3 and WEP passwords are checked before they are sent; networks that need
+  a login (802.1X) are set up in Plasma's editor (`kcm_networkmanagement`,
+  which a sheet and "Add a VPN" open). The hotspot is one saved profile
+  (`mode=ap`, `ipv4.method=shared`, WPA2): the switch starts the saved one, or
+  asks for a name and a made-up password the first time; "Change…" replaces
+  it. Airplane mode switches Wi-Fi and mobile broadband (NetworkManager) and
+  Bluetooth (BlueZ) off together. SSIDs and connection names are decoded
+  lossily, capped at 32 and 64 characters and cleaned like other D-Bus text;
+  hidden networks (no name) aren't listed.
+- **Bluetooth & Devices** is BlueZ's, through `settings_sys::bluetooth`: one
+  `GetManagedObjects` read gives the adapter and its devices, which the page
+  names by address (the client looks the object path up itself, so a page
+  never sends a path). Paired devices are always listed; an unpaired one only
+  while it is in range and names itself. A click pairs, trusts and connects a
+  nearby device; a paired one opens a sheet (connect, disconnect, forget,
+  battery from `Battery1`). Pairing that needs a PIN or a confirmation is
+  asked by the session's Bluetooth agent (Plasma's BlueDevil): Settings
+  registers none of its own yet. Looking for devices runs on a thread of its
+  own that holds the D-Bus connection (BlueZ ends a client's search when its
+  connection goes), only while the page is shown, Bluetooth is on and the
+  window isn't minimized, and ends when the page goes. Visible to Other
+  Devices (Advanced) is the adapter's `Discoverable`; BlueZ turns it off after
+  its own timeout. Printers opens `kcm_printer_manager`.
+- **Both pages look again while shown** (every 6 s and 3 s, not while the
+  window is minimized) instead of subscribing to D-Bus signals, so a page has
+  no watcher thread to end; each read runs on a worker thread and is skipped
+  while another is under way or a change is in progress.
+- **Home** is the device name and the system's name, three switches (Wi-Fi
+  and Bluetooth, which use the Network and Bluetooth backends; Dark Mode) and
+  links to six pages (the registry's `related` for `home`). Dark Mode reads
+  `[General] ColorScheme` of `kdeglobals` through KConfig
+  (`cpp/colorscheme.cpp`) and switches between the image's `AtlasOSLight` and
+  `AtlasOSDark` by starting `plasma-apply-colorscheme <name>` through the
+  Launcher (argv, `/usr/bin` only); Plasma writes the file and repaints. The
+  Appearance page does the same with the same two names.
+- **Smoke runs with services:** a debug build started with
+  `ATLAS_SETTINGS_TEST_BUS=<address>` uses that bus instead of the system bus
+  (`src/support.rs`; release builds ignore it).
+  `scripts/with-mock-services.py <command>` starts a private bus with
+  python-dbusmock's NetworkManager and BlueZ, filled with a few networks and
+  devices, and runs the command with the variable set:
+  `scripts/dev.sh scripts/with-mock-services.py scripts/smoke.sh network`.
+
+## Displays and Sound
+
+Both are QML pages over a small C++ QObject made by `PageBackends` when the
+page is shown and gone with it; the logic that needs no screen or sound
+server is in plain Qt files that Qt Test covers (`apps/atlas-settings/tests`,
+run with `ctest`).
+
+- **Displays** reads and sets the screens through libkscreen
+  (`cpp/screenconfig.cpp`: `GetConfigOperation`, `SetConfigOperation`; KWin's
+  output management on Wayland), as Plasma 6.7's Display Configuration does:
+  scale from 50 % to 300 % in 5 % steps (every step is exact in 1/120, the
+  Wayland fractional-scale unit), the mode kept at the same refresh rate when
+  the new resolution has it and the fastest otherwise, rotation as its four
+  turns, HDR and wide colour gamut together, the main screen as priority 1.
+  The screens must touch along an edge and never overlap; a drag snaps to the
+  nearest edge (`cpp/displaylogic.cpp`) and positions start at 0, 0.
+  Resolution, scale, rate, rotation, HDR and arrangement ask "Keep these
+  settings?" for 15 s and put the earlier settings back when nobody answers,
+  or when Settings closes with the question open; making a screen the main
+  one doesn't ask. Scale is applied when the slider is let go. Night Light is
+  `kwinrc [NightColor]` (`Active`, `Mode` 0 or 1, `NightTemperature`) through
+  KConfig, which KWin watches, with `org.kde.KWin.NightLight` asked
+  asynchronously for whether it works and to preview a temperature while the
+  slider moves (`cpp/nightlight.cpp`). The schedule is Plasma's "Sunrise and
+  sunset" (Dark-Light schedule, set in Plasma's Night Time page) or all day.
+  A screen's name is its vendor and model (the connector's name when it has
+  none), shown as plain text.
+- **Sound** talks to the PulseAudio API on PipeWire through PulseAudioQt
+  (`cpp/soundmixer.cpp`), which Plasma uses too, on the GUI thread's event
+  loop. Nothing is applied: every slider is live and the server tells the
+  page about changes from anywhere. The lists leave out virtual devices (but
+  not the default one), monitors of outputs, streams that are paused or
+  virtual, and the system's own event sounds. App names and icons come from
+  the stream's properties, made safe to show (a theme icon name, never a
+  path).
+- **Testing without screens or sound.** `ATLAS_SETTINGS_FAKE_DISPLAYS=<json>`
+  (built with `ATLAS_SETTINGS_TEST_HOOKS`, on by default) gives Displays
+  libkscreen's Fake backend with the layout in that file
+  (`tests/fixtures/displays-two.json`: a 3840x2160 screen at 1.7x with an
+  upright 1920x1080 one); it is the only place Settings uses a private
+  libkscreen header. The Sound test (`soundmixer_test`) needs a private
+  PipeWire with null devices and skips without one
+  (`ATLAS_TEST_SOUND=private`). Neither touches the real screens or audio.
 
 ## Appearance, Keyboard & Mouse, Notifications and Accessibility
 
