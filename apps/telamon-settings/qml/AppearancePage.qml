@@ -5,8 +5,10 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import Telamon.Ui
 
-// Appearance: Light or Dark, the accent colour, the wallpaper, transparency
-// and the dock; under Advanced the top bar, hot corners, virtual desktops
+// Appearance: a picture of the desktop that follows the choices below it (and
+// previews a Light or Dark card or an accent swatch under the pointer), Light
+// or Dark, the accent colour, the wallpaper, transparency and the dock; under
+// Advanced the top bar, hot corners, virtual desktops
 // and the Global Theme. The colour scheme, the wallpaper and the Global Theme
 // are applied by Plasma's own tools (plasma-apply-*), the dock and the top
 // bar through Plasma's panel scripting, everything else through the files
@@ -21,13 +23,24 @@ SettingsPage {
     // A choice the tools haven't written yet, so the page answers at once.
     property var pendingDark: null
     property string pendingAccent: ""
+    // The wallpaper chosen in the sheet, {id, name, preview, picture,
+    // pictureDark}, until Plasma has saved it (it does so a while later).
+    property var pendingWallpaper: null
     property string notice: ""
+    // What the pointer (or the keyboard focus) is on: a Light or Dark card
+    // (false, true), an accent swatch ("" is violet); null for neither. The
+    // picture shows it before it is chosen.
+    property var hoverDark: null
+    property var hoverAccent: null
 
     readonly property bool dark: pendingDark !== null ? pendingDark : (prefs.dark ?? false)
     readonly property var shell: cfg ? cfg.shell : ({})
     readonly property var dock: shell.dock ?? ({})
     readonly property bool dockFound: (shell.known ?? false) && (dock.found ?? false)
     readonly property var barState: shell.topBar ?? ({})
+    // Until the panels have answered, the picture has both.
+    readonly property bool showDock: !(shell.known ?? false) || page.dockFound
+    readonly property bool showBar: !(shell.known ?? false) || (page.barState.found ?? false)
 
     // The accent swatches. "" is Atlas violet, the scheme's own accent.
     readonly property var accents: [
@@ -83,6 +96,37 @@ SettingsPage {
         return hit ? hit.name : qsTr("Custom");
     }
 
+    // Telamon.Ui's violet in each scheme: the accent when none is chosen.
+    readonly property var violet: ({
+            "light": "#6858e2", // telamon-lint: allow-raw
+            "dark": "#8a7af4" // telamon-lint: allow-raw
+        })
+
+    // What the picture of the desktop shows.
+    readonly property bool previewDark: page.hoverDark !== null ? page.hoverDark : page.dark
+    readonly property string previewAccentValue: page.hoverAccent !== null ? page.hoverAccent : page.accentValue
+    readonly property string previewAccent: page.previewAccentValue !== "" ? page.previewAccentValue : (page.previewDark ? page.violet.dark : page.violet.light)
+    readonly property var wallpaperNow: page.pendingWallpaper ?? page.prefs.wallpaper ?? ({})
+    // The image of the wallpaper for a Light or a Dark desktop (Plasma shows
+    // a package's dark images with a dark scheme).
+    function wallpaperPicture(dark: bool): string {
+        const w = page.wallpaperNow;
+        return (dark && w.pictureDark) ? w.pictureDark : (w.picture ?? "");
+    }
+    // The note under the picture: what it is, or what is being previewed.
+    readonly property string previewNote: {
+        if (page.hoverDark !== null && page.hoverDark !== page.dark)
+            return page.hoverDark ? qsTr("Previewing Dark. Click to use it.") : qsTr("Previewing Light. Click to use it.");
+        if (page.hoverAccent !== null && page.hoverAccent.toLowerCase() !== page.accentValue.toLowerCase())
+            return qsTr("Previewing %1. Click to use it.").arg(page.accentLabel(page.hoverAccent));
+        return qsTr("A preview of your desktop");
+    }
+
+    function accentLabel(value: string): string {
+        const hit = page.accents.find(a => a.value === value.toLowerCase());
+        return hit ? hit.name : qsTr("Custom");
+    }
+
     function dockSummary(): string {
         if (!page.shell.known)
             return "";
@@ -130,6 +174,8 @@ SettingsPage {
             if (page.pendingDark !== null && p.dark === page.pendingDark)
                 page.pendingDark = null;
             const want = page.pendingAccent;
+            if (page.pendingWallpaper !== null && (p.wallpaper.id ?? "") === page.pendingWallpaper.id)
+                page.pendingWallpaper = null;
             if (want === "wallpaper" ? p.accentFromWallpaper : want === "default" ? p.accentIsDefault : want !== "" && !p.accentFromWallpaper && (p.accent ?? "").toLowerCase() === want.toLowerCase())
                 page.pendingAccent = "";
         }
@@ -154,6 +200,27 @@ SettingsPage {
         }
     }
 
+    // Plasma saves its choice of wallpaper some seconds after it is made: until
+    // then the picture shows the choice, but not for ever.
+    Timer {
+        id: wallpaperSettle
+        interval: 30000
+        onTriggered: page.pendingWallpaper = null
+    }
+
+    function chooseWallpaper(w: var) {
+        const pictures = page.cfg.wallpaperPictures(w.id);
+        page.pendingWallpaper = {
+            "id": w.id,
+            "name": w.name,
+            "preview": w.preview,
+            "picture": pictures.picture ?? w.preview,
+            "pictureDark": pictures.pictureDark ?? ""
+        };
+        wallpaperSettle.restart();
+        page.cfg.setWallpaper(w.id);
+    }
+
     InfoBanner {
         Layout.fillWidth: true
         type: "warning"
@@ -163,8 +230,38 @@ SettingsPage {
         onClosed: page.notice = ""
     }
 
-    // One of the two looks, drawn small: the window of that look in the
-    // chosen accent.
+    // The desktop, large: what the choices below do, as they are made.
+    // Nothing in it is the user's, and it is not a control.
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: Kirigami.Units.smallSpacing
+
+        DesktopPreview {
+            objectName: "desktop-preview"
+            Layout.fillWidth: true
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 34
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredHeight: Math.round(width * 0.625)
+            dark: page.previewDark
+            accent: page.previewAccent
+            wallpaper: page.wallpaperPicture(page.previewDark)
+            translucent: Appearance.effective
+            showBar: page.showBar
+            showDock: page.showDock
+            dockPosition: page.dock.location ?? "bottom"
+            dockAutoHide: page.dock.autohide ?? false
+            dockSize: page.dock.height ?? 60
+        }
+        TelamonLabel {
+            Layout.alignment: Qt.AlignHCenter
+            textStyle: TelamonLabel.Caption
+            text: page.previewNote
+        }
+    }
+
+    // One of the two looks, drawn small: the desktop in that look, in the
+    // chosen accent. The pointer or the keyboard focus on it previews it in
+    // the large picture.
     component StyleCard: Item {
         id: card
 
@@ -172,16 +269,15 @@ SettingsPage {
         required property bool light
         required property bool selected
         // The accent shown in the picture.
-        property color accent: light ? "#6858e2" : "#8a7af4"
+        property color accent: light ? page.violet.light : page.violet.dark
+        // The pointer or the keyboard is on the card.
+        readonly property bool previewed: hover.hovered || card.activeFocus
 
         signal chosen
 
-        readonly property color base: light ? "#f6f5fb" : "#211e38"
-        readonly property color raised: light ? "#ffffff" : "#2b2748"
-        readonly property color ink: light ? "#2a2740" : "#eeecfa"
-
         Layout.fillWidth: true
         Layout.preferredWidth: 1
+        Layout.maximumWidth: Kirigami.Units.gridUnit * 13
         implicitHeight: preview.height + labelRow.height + Kirigami.Units.smallSpacing * 3
         activeFocusOnTab: true
         Accessible.role: Accessible.RadioButton
@@ -192,68 +288,35 @@ SettingsPage {
         Keys.onSpacePressed: card.chosen()
         Keys.onReturnPressed: card.chosen()
 
-        Rectangle {
+        Item {
             id: preview
             width: parent.width
-            height: Math.round(width * 0.56)
-            radius: TelamonStyle.radius
-            color: card.base
-            border.width: card.selected ? 2 : 1
-            border.color: card.selected ? TelamonStyle.accent : (card.activeFocus ? TelamonStyle.focus : TelamonStyle.separator)
+            height: Math.round(width * 0.625)
 
-            // The sidebar and the title bar of a window.
+            DesktopPreview {
+                anchors.fill: parent
+                dark: !card.light
+                accent: card.accent
+                wallpaper: page.wallpaperPicture(!card.light)
+                translucent: Appearance.effective
+                blur: false
+                showBar: page.showBar
+                showDock: page.showDock
+                dockPosition: page.dock.location ?? "bottom"
+                dockAutoHide: page.dock.autohide ?? false
+                dockSize: page.dock.height ?? 60
+            }
+            // The ring: the accent when chosen, fainter on hover and focus.
             Rectangle {
                 anchors.fill: parent
-                anchors.margins: Kirigami.Units.largeSpacing
-                radius: TelamonStyle.radiusSmall
-                color: card.raised
-
-                Rectangle {
-                    x: 0
-                    y: 0
-                    width: parent.width * 0.3
-                    height: parent.height
-                    radius: TelamonStyle.radiusSmall
-                    color: Qt.rgba(card.ink.r, card.ink.g, card.ink.b, 0.08)
-                    Column {
-                        x: 8
-                        y: 10
-                        spacing: 6
-                        Repeater {
-                            model: 3
-                            Rectangle {
-                                required property int index
-                                width: index === 0 ? 30 : 22
-                                height: 5
-                                radius: 2.5
-                                color: index === 0 ? card.accent : Qt.rgba(card.ink.r, card.ink.g, card.ink.b, 0.3)
-                            }
-                        }
-                    }
-                }
-                Column {
-                    x: parent.width * 0.3 + 10
-                    y: 10
-                    spacing: 6
-                    Rectangle {
-                        width: 54
-                        height: 6
-                        radius: 3
-                        color: card.ink
-                        opacity: 0.8
-                    }
-                    Rectangle {
-                        width: 74
-                        height: 5
-                        radius: 2.5
-                        color: card.ink
-                        opacity: 0.3
-                    }
-                    Rectangle {
-                        width: 40
-                        height: 14
-                        radius: 4
-                        color: card.accent
+                anchors.margins: -Kirigami.Units.smallSpacing
+                radius: TelamonStyle.radiusLarge + Kirigami.Units.smallSpacing
+                color: "transparent"
+                border.width: card.selected ? 3 : 2
+                border.color: card.selected ? TelamonStyle.accent : (card.previewed ? (card.activeFocus ? TelamonStyle.focus : TelamonStyle.alpha(TelamonStyle.accent, 0.45)) : "transparent")
+                Behavior on border.color {
+                    ColorAnimation {
+                        duration: TelamonStyle.durationShort
                     }
                 }
             }
@@ -286,6 +349,9 @@ SettingsPage {
             }
         }
 
+        HoverHandler {
+            id: hover
+        }
         TapHandler {
             onTapped: card.chosen()
         }
@@ -298,6 +364,8 @@ SettingsPage {
         required property color swatchColor
         required property string swatchName
         required property bool selected
+        // The pointer or the keyboard is on the swatch.
+        readonly property bool previewed: hover.hovered || swatch.activeFocus
 
         signal chosen
 
@@ -344,11 +412,20 @@ SettingsPage {
             Layout.margins: Kirigami.Units.largeSpacing
             spacing: Kirigami.Units.largeSpacing * 2
 
+            Item {
+                Layout.fillWidth: true
+            }
             StyleCard {
                 label: qsTr("Light")
                 light: true
-                accent: page.accentValue !== "" ? page.accentValue : "#6858e2"
+                accent: page.accentValue !== "" ? page.accentValue : page.violet.light
                 selected: !page.dark
+                onPreviewedChanged: {
+                    if (previewed)
+                        page.hoverDark = false;
+                    else if (page.hoverDark === false)
+                        page.hoverDark = null;
+                }
                 onChosen: {
                     page.pendingDark = false;
                     settle.restart();
@@ -358,13 +435,22 @@ SettingsPage {
             StyleCard {
                 label: qsTr("Dark")
                 light: false
-                accent: page.accentValue !== "" ? page.accentValue : "#8a7af4"
+                accent: page.accentValue !== "" ? page.accentValue : page.violet.dark
                 selected: page.dark
+                onPreviewedChanged: {
+                    if (previewed)
+                        page.hoverDark = true;
+                    else if (page.hoverDark === true)
+                        page.hoverDark = null;
+                }
                 onChosen: {
                     page.pendingDark = true;
                     settle.restart();
                     page.cfg.setDark(true);
                 }
+            }
+            Item {
+                Layout.fillWidth: true
             }
         }
     }
@@ -389,9 +475,15 @@ SettingsPage {
 
                 Swatch {
                     required property var modelData
-                    swatchColor: modelData.value !== "" ? modelData.value : (page.dark ? "#8a7af4" : "#6858e2")
+                    swatchColor: modelData.value !== "" ? modelData.value : (page.dark ? page.violet.dark : page.violet.light)
                     swatchName: modelData.name
                     selected: !page.accentFromWallpaper && page.accentValue.toLowerCase() === modelData.value
+                    onPreviewedChanged: {
+                        if (previewed)
+                            page.hoverAccent = modelData.value;
+                        else if (page.hoverAccent === modelData.value)
+                            page.hoverAccent = null;
+                    }
                     onChosen: {
                         page.pendingAccent = modelData.value === "" ? "default" : modelData.value;
                         settle.restart();
@@ -428,7 +520,7 @@ SettingsPage {
         SectionRow {
             objectName: "wallpaper"
             title: qsTr("Wallpaper")
-            value: page.prefs.wallpaper ? page.prefs.wallpaper.name : ""
+            value: page.wallpaperNow.name ?? ""
             chevron: true
             enabled: page.cfg !== null
             onClicked: wallpaperSheet.open()
@@ -445,7 +537,7 @@ SettingsPage {
                     id: thumb
                     anchors.fill: parent
                     anchors.margins: 1
-                    source: page.prefs.wallpaper ? page.prefs.wallpaper.preview : ""
+                    source: page.wallpaperNow.preview ?? ""
                     sourceSize: Qt.size(160, 100)
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
@@ -571,7 +663,7 @@ SettingsPage {
                     Keys.onReturnPressed: tile.choose()
 
                     function choose() {
-                        page.cfg.setWallpaper(modelData.id);
+                        page.chooseWallpaper(modelData);
                         wallpaperSheet.close();
                     }
 

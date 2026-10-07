@@ -131,6 +131,7 @@ qt_add_qml_module(telamon-settings-app
         qml/DevicesPage.qml
         qml/HomePage.qml
         qml/AppearancePage.qml
+        qml/DesktopPreview.qml
         qml/InputPage.qml
         qml/NotificationsPage.qml
         qml/AccessibilityPage.qml

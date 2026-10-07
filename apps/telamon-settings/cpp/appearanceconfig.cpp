@@ -9,6 +9,7 @@
 #include <QDBusArgument>
 #include <QDir>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -184,6 +185,47 @@ QString packagePreview(const QString &packageDir)
     return firstImageIn(packageDir + u"/contents/images"_s);
 }
 
+// The picture to draw for a folder of a package's images (named `1920x1200.jpg`
+// by Plasma's convention): the largest up to 2560 wide, so a big screen's
+// image is not decoded for a small drawing; the narrowest of the rest when
+// all are wider. JPEG, PNG and WebP only: Qt reads no more by itself.
+QString bestImageIn(const QString &dir)
+{
+    static const QRegularExpression sized(u"^(\\d{1,5})x(\\d{1,5})\\."_s);
+    const QFileInfoList files = QDir(dir).entryInfoList({u"*.png"_s, u"*.jpg"_s, u"*.jpeg"_s, u"*.webp"_s}, QDir::Files | QDir::Readable, QDir::Name);
+    constexpr qint64 MaxWidth = 2560;
+    QString best;
+    qint64 bestArea = -1;
+    QString narrowest;
+    qint64 narrowestWidth = 0;
+    for (const QFileInfo &file : files) {
+        const QRegularExpressionMatch m = sized.match(file.fileName());
+        const qint64 width = m.hasMatch() ? m.captured(1).toLongLong() : 0;
+        const qint64 area = m.hasMatch() ? width * m.captured(2).toLongLong() : 0;
+        if (width <= MaxWidth && area > bestArea) {
+            best = file.absoluteFilePath();
+            bestArea = area;
+        } else if (width > MaxWidth && (narrowest.isEmpty() || width < narrowestWidth)) {
+            narrowest = file.absoluteFilePath();
+            narrowestWidth = width;
+        }
+    }
+    return best.isEmpty() ? narrowest : best;
+}
+
+// {picture, pictureDark} (file URLs, "" for none) of a wallpaper package: the
+// image Plasma shows, and the one it shows with a dark colour scheme.
+QVariantMap packagePictures(const QString &packageDir)
+{
+    QString picture = bestImageIn(packageDir + u"/contents/images"_s);
+    if (picture.isEmpty()) {
+        picture = packagePreview(packageDir);
+    }
+    const QString dark = bestImageIn(packageDir + u"/contents/images_dark"_s);
+    return {{u"picture"_s, picture.isEmpty() ? QString() : QUrl::fromLocalFile(picture).toString()},
+            {u"pictureDark"_s, dark.isEmpty() ? QString() : QUrl::fromLocalFile(dark).toString()}};
+}
+
 QString packageName(const QString &packageDir, const QString &id)
 {
     QFile f(packageDir + u"/metadata.json"_s);
@@ -216,6 +258,23 @@ AppearanceConfig::AppearanceConfig(QObject *parent)
         if (name.isEmpty() || name == u"General"_s || name == u"KDE"_s || name == u"Icons"_s) {
             scheduleRead();
         }
+    });
+
+    // The wallpaper is in Plasma's applets file, which it saves a while after
+    // a change, by replacing the file: watch it, and the new file after each
+    // save, so the page's picture follows.
+    const QString applets = kdeutil::configHome() + u"/plasma-org.kde.plasma.desktop-appletsrc"_s;
+    auto *files = new QFileSystemWatcher(this);
+    if (QFileInfo::exists(applets)) {
+        files->addPath(applets);
+    }
+    connect(files, &QFileSystemWatcher::fileChanged, this, [this, files, applets] {
+        QTimer::singleShot(300, this, [this, files, applets] {
+            if (QFileInfo::exists(applets) && !files->files().contains(applets)) {
+                files->addPath(applets);
+            }
+            scheduleRead();
+        });
     });
 }
 
@@ -280,17 +339,30 @@ QVariantMap AppearanceConfig::read() const
     const bool isDefault = !fromWallpaper && (accent.isEmpty() || accent.compare(QLatin1String(dark ? VioletDark : VioletLight), Qt::CaseInsensitive) == 0);
 
     // The wallpaper of the desktop: Plasma keeps it in the applets file
-    // (read only; the change goes through plasma-apply-wallpaperimage).
-    QVariantMap wallpaper{{u"id"_s, QString()}, {u"name"_s, QString()}, {u"preview"_s, QString()}};
+    // (read only; the change goes through plasma-apply-wallpaperimage). The
+    // main screen's (containment 0) when there are several; `picture` and
+    // `pictureDark` are what is drawn for it, and Telamon OS's own wallpaper
+    // when none is set.
+    QVariantMap wallpaper{{u"id"_s, QString()}, {u"name"_s, QString()}, {u"preview"_s, QString()}, {u"picture"_s, QString()}, {u"pictureDark"_s, QString()}};
     KConfig applets(u"plasma-org.kde.plasma.desktop-appletsrc"_s, KConfig::SimpleConfig);
     const KConfigGroup containments(&applets, u"Containments"_s);
+    QString image;
+    bool mainScreen = false;
     for (const QString &id : containments.groupList()) {
         const KConfigGroup c(&containments, id);
-        const KConfigGroup general = c.group(u"Wallpaper"_s).group(u"org.kde.image"_s).group(u"General"_s);
-        const QString image = general.readEntry("Image", QString());
-        if (image.isEmpty()) {
+        // A slideshow or a plain colour is not a picture.
+        const QString plugin = c.readEntry("wallpaperplugin", QString());
+        const QString candidate = c.group(u"Wallpaper"_s).group(u"org.kde.image"_s).group(u"General"_s).readEntry("Image", QString());
+        if (candidate.isEmpty() || (!plugin.isEmpty() && plugin != u"org.kde.image"_s)) {
             continue;
         }
+        const bool main = c.readEntry("lastScreen", -1) == 0;
+        if (image.isEmpty() || (main && !mainScreen)) {
+            image = candidate;
+            mainScreen = main;
+        }
+    }
+    if (!image.isEmpty()) {
         const QString path = QUrl(image).isLocalFile() ? QUrl(image).toLocalFile() : image;
         const QFileInfo info(path);
         if (info.isDir() || path.endsWith(u'/')) {
@@ -299,10 +371,19 @@ QVariantMap AppearanceConfig::read() const
             wallpaper = {{u"id"_s, dirName},
                          {u"name"_s, dir.isEmpty() ? dirName : packageName(dir, dirName)},
                          {u"preview"_s, dir.isEmpty() ? QString() : QUrl::fromLocalFile(packagePreview(dir)).toString()}};
+            if (!dir.isEmpty()) {
+                wallpaper.insert(packagePictures(dir));
+            }
         } else {
-            wallpaper = {{u"id"_s, path}, {u"name"_s, info.completeBaseName()}, {u"preview"_s, QUrl::fromLocalFile(path).toString()}};
+            const QString url = QUrl::fromLocalFile(path).toString();
+            wallpaper = {{u"id"_s, path}, {u"name"_s, info.completeBaseName()}, {u"preview"_s, url}, {u"picture"_s, info.isFile() ? url : QString()}};
         }
-        break;
+    }
+    if (wallpaper.value(u"picture"_s).toString().isEmpty()) {
+        const QString dir = packageDirOf(u"Telamon"_s);
+        if (!dir.isEmpty()) {
+            wallpaper.insert(packagePictures(dir));
+        }
     }
 
     return {
@@ -474,6 +555,23 @@ QVariantList AppearanceConfig::wallpapers() const
                                 {u"kind"_s, u"image"_s}});
     }
     return list;
+}
+
+QVariantMap AppearanceConfig::wallpaperPictures(const QString &id) const
+{
+    // Only what wallpapers() offers, as setWallpaper().
+    for (const QVariant &v : wallpapers()) {
+        const QVariantMap w = v.toMap();
+        if (w.value(u"id"_s).toString() != id) {
+            continue;
+        }
+        if (w.value(u"kind"_s).toString() == u"package"_s) {
+            const QString dir = packageDirOf(id);
+            return dir.isEmpty() ? QVariantMap() : packagePictures(dir);
+        }
+        return {{u"picture"_s, w.value(u"preview"_s)}, {u"pictureDark"_s, QString()}};
+    }
+    return {};
 }
 
 void AppearanceConfig::setWallpaper(const QString &id)
