@@ -11,8 +11,8 @@ use crate::error::clean;
 use crate::{Error, ErrorKind};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use zbus::blocking::proxy::{Builder, Proxy};
 use zbus::blocking::Connection;
+use zbus::blocking::proxy::{Builder, Proxy};
 use zbus::proxy::CacheProperties;
 use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 
@@ -310,7 +310,10 @@ impl Network {
             out.push(Device {
                 kind,
                 state,
-                interface: clean(&d.get_property::<String>("Interface").unwrap_or_default(), 32),
+                interface: clean(
+                    &d.get_property::<String>("Interface").unwrap_or_default(),
+                    32,
+                ),
                 path,
             });
         }
@@ -584,7 +587,10 @@ impl Network {
                 Ok(_) | Err(_) => return Err(refused("the connection did not come up")),
             }
             if started.elapsed() > ACTIVATE_TIMEOUT {
-                return Err(Error::new(ErrorKind::Timeout, "the connection took too long"));
+                return Err(Error::new(
+                    ErrorKind::Timeout,
+                    "the connection took too long",
+                ));
             }
             std::thread::sleep(Duration::from_millis(250));
         }
@@ -609,9 +615,9 @@ impl Network {
             .max_by_key(|a| a.signal)
             .ok_or_else(|| refused("that network is out of range"))?;
         let saved = self.saved()?;
-        let known = saved.iter().find(|s| {
-            s.kind == "802-11-wireless" && s.mode != "ap" && ssid_text(&s.ssid) == ssid
-        });
+        let known = saved
+            .iter()
+            .find(|s| s.kind == "802-11-wireless" && s.mode != "ap" && ssid_text(&s.ssid) == ssid);
         let nm = self.nm_interactive()?;
 
         let (created, active): (Option<String>, OwnedObjectPath) = match (known, password) {
@@ -619,7 +625,10 @@ impl Network {
                 let path = op(k.path.as_str())?;
                 let dev_path = op(dev.path.as_str())?;
                 let ap_path = op(ap.path.as_str())?;
-                (None, nm.call("ActivateConnection", &(path, dev_path, ap_path))?)
+                (
+                    None,
+                    nm.call("ActivateConnection", &(path, dev_path, ap_path))?,
+                )
             }
             _ => {
                 let settings = wifi_settings(&ap, password)?;
@@ -765,7 +774,10 @@ type NewSettings<'a> = HashMap<&'static str, HashMap<&'static str, Value<'a>>>;
 
 /// The connection for a new Wi-Fi network with its password. NetworkManager
 /// fills in the rest, and keeps the password in its own store.
-fn wifi_settings<'a>(ap: &AccessPoint, password: Option<&'a Secret>) -> Result<NewSettings<'a>, Error> {
+fn wifi_settings<'a>(
+    ap: &AccessPoint,
+    password: Option<&'a Secret>,
+) -> Result<NewSettings<'a>, Error> {
     let mut s: NewSettings<'a> = HashMap::new();
     s.entry("connection").or_default().extend([
         ("type", Value::from("802-11-wireless")),

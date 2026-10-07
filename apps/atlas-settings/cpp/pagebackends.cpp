@@ -1,5 +1,6 @@
 #include "pagebackends.h"
 
+#include "colorscheme.h"
 #include "localeconfig.h"
 
 #include <QDebug>
@@ -13,6 +14,8 @@ QObject *PageBackends::create(const QString &kind, QObject *parent)
     QObject *object = nullptr;
     if (kind == QLatin1String("locale-config")) {
         object = new LocaleConfig;
+    } else if (kind == QLatin1String("color-scheme")) {
+        object = new ColorSchemeConfig;
     } else {
         object = static_cast<QObject *>(atlas_page_backend_new(kind.toUtf8().constData()));
     }

@@ -7,5 +7,7 @@ fn main() {
         .file("src/backend.rs")
         .file("src/time_language.rs")
         .file("src/system_info.rs")
+        .file("src/network.rs")
+        .file("src/bluetooth.rs")
         .build();
 }

@@ -28,6 +28,8 @@ pub const MAX_DEVICES: usize = 100;
 
 type Props = HashMap<String, OwnedValue>;
 type Objects = HashMap<OwnedObjectPath, HashMap<String, Props>>;
+/// The adapter's object path and what it says.
+type Found = Option<(String, Adapter)>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Adapter {
@@ -132,7 +134,7 @@ fn refused(detail: impl Into<String>) -> Error {
 }
 
 /// The adapter and devices in BlueZ's managed objects. Pure, for tests.
-fn parse(objects: &Objects) -> (Option<(String, Adapter)>, Snapshot) {
+fn parse(objects: &Objects) -> (Found, Snapshot) {
     let mut adapters: Vec<(&OwnedObjectPath, &Props)> = objects
         .iter()
         .filter_map(|(p, i)| i.get(ADAPTER_IFACE).map(|props| (p, props)))
@@ -248,7 +250,7 @@ impl Bluetooth {
             .call("GetManagedObjects", &())?)
     }
 
-    fn read(&self) -> Result<(Option<(String, Adapter)>, Snapshot, Objects), Error> {
+    fn read(&self) -> Result<(Found, Snapshot, Objects), Error> {
         let objects = self.objects()?;
         let (adapter, snapshot) = parse(&objects);
         Ok((adapter, snapshot, objects))
@@ -377,7 +379,13 @@ mod tests {
     fn addresses() {
         assert!(valid_address("AA:BB:CC:DD:EE:FF"));
         assert!(valid_address("aa:bb:cc:dd:ee:0f"));
-        for bad in ["", "AA:BB:CC:DD:EE", "AA-BB-CC-DD-EE-FF", "AA:BB:CC:DD:EE:GG", "../x"] {
+        for bad in [
+            "",
+            "AA:BB:CC:DD:EE",
+            "AA-BB-CC-DD-EE-FF",
+            "AA:BB:CC:DD:EE:GG",
+            "../x",
+        ] {
             assert!(!valid_address(bad), "{bad:?}");
         }
     }

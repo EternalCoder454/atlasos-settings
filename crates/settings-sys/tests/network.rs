@@ -44,7 +44,17 @@ fn access_point(bus: &common::MockBus, dev: &str, name: &str, ssid: &str, streng
         MAIN,
         MOCK,
         "AddAccessPoint",
-        &(dev, name, ssid, "00:11:22:33:44:55", 2u32, 2412u32, 54000u32, strength, sec),
+        &(
+            dev,
+            name,
+            ssid,
+            "00:11:22:33:44:55",
+            2u32,
+            2412u32,
+            54000u32,
+            strength,
+            sec,
+        ),
     );
 }
 
@@ -88,7 +98,13 @@ fn lists_networks_strongest_per_name_and_marks_the_known_ones() {
     access_point(&bus, &dev, "ap4", "Work", 90, 0x200);
     access_point(&bus, &dev, "ap5", "bad\u{1b}[31m\u{202E}name", 20, 0x100);
     access_point(&bus, &dev, "ap6", "", 99, 0);
-    let _: String = call(&bus, MAIN, MOCK, "AddWiFiConnection", &(&dev, "saved1", "Cafe", ""));
+    let _: String = call(
+        &bus,
+        MAIN,
+        MOCK,
+        "AddWiFiConnection",
+        &(&dev, "saved1", "Cafe", ""),
+    );
 
     let net = Network::new(&bus.bus()).expect("connect");
     let s = net.status().expect("status");
@@ -183,7 +199,12 @@ fn joins_a_network_with_a_password_and_forgets_it() {
 
     // Leaving keeps it saved; forgetting removes it.
     net.disconnect_wifi().expect("disconnect");
-    assert!(net.wifi_networks().expect("networks").iter().all(|n| !n.connected));
+    assert!(
+        net.wifi_networks()
+            .expect("networks")
+            .iter()
+            .all(|n| !n.connected)
+    );
     net.forget_wifi("Home").expect("forget");
     let list = net.wifi_networks().expect("networks");
     assert!(!list.iter().find(|n| n.ssid == "Home").expect("Home").known);
@@ -220,7 +241,13 @@ fn the_radios_and_airplane_mode() {
 #[test]
 fn wired_status() {
     let Some(bus) = start() else { return };
-    let _: String = call(&bus, MAIN, MOCK, "AddEthernetDevice", &("eth0", "enp3s0", 100u32));
+    let _: String = call(
+        &bus,
+        MAIN,
+        MOCK,
+        "AddEthernetDevice",
+        &("eth0", "enp3s0", 100u32),
+    );
     let net = Network::new(&bus.bus()).expect("connect");
     let s = net.status().expect("status");
     let wired = s.wired.expect("a wired device");
@@ -231,8 +258,17 @@ fn wired_status() {
 
     // No cable.
     let bus2 = start().expect("second bus");
-    let _: String = call(&bus2, MAIN, MOCK, "AddEthernetDevice", &("eth0", "enp3s0", 20u32));
-    let s = Network::new(&bus2.bus()).expect("connect").status().expect("status");
+    let _: String = call(
+        &bus2,
+        MAIN,
+        MOCK,
+        "AddEthernetDevice",
+        &("eth0", "enp3s0", 20u32),
+    );
+    let s = Network::new(&bus2.bus())
+        .expect("connect")
+        .status()
+        .expect("status");
     assert_eq!(s.wired.expect("wired").link, Link::Unplugged);
 }
 
@@ -246,9 +282,10 @@ fn vpn_connections() {
         ("id", Value::from("Work VPN")),
         ("uuid", Value::from("11111111-2222-3333-4444-555555555555")),
     ]);
-    vpn.entry("vpn")
-        .or_default()
-        .insert("service-type", Value::from("org.freedesktop.NetworkManager.openvpn"));
+    vpn.entry("vpn").or_default().insert(
+        "service-type",
+        Value::from("org.freedesktop.NetworkManager.openvpn"),
+    );
     let _: zbus::zvariant::OwnedObjectPath = call(
         &bus,
         "/org/freedesktop/NetworkManager/Settings",
@@ -303,7 +340,10 @@ fn the_hotspot() {
         "LastSettings",
         &(),
     );
-    assert!(sent.contains("sharing is caring") && sent.contains("shared"), "{sent}");
+    assert!(
+        sent.contains("sharing is caring") && sent.contains("shared"),
+        "{sent}"
+    );
     assert!(sent.contains("'ap'") || sent.contains("\"ap\""), "{sent}");
     let h = net.status().expect("status").hotspot.expect("hotspot");
     assert_eq!(h.ssid, "Zach's PC");
@@ -316,7 +356,13 @@ fn the_hotspot() {
     assert!(!h.active);
 
     net.start_hotspot("", None).expect("start the saved one");
-    assert!(net.status().expect("status").hotspot.expect("hotspot").active);
+    assert!(
+        net.status()
+            .expect("status")
+            .hotspot
+            .expect("hotspot")
+            .active
+    );
 }
 
 #[test]

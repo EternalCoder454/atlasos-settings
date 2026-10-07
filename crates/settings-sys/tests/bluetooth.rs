@@ -47,8 +47,20 @@ fn lists_paired_and_nearby_devices() {
     let nearby = device(&bus, "AA:BB:CC:00:00:02", "Speaker");
     device(&bus, "AA:BB:CC:00:00:03", "");
     device(&bus, "AA:BB:CC:00:00:04", "Old Phone");
-    let _: () = call(&bus, "/", MOCK, "PairDevice", &("hci0", "AA:BB:CC:00:00:04"));
-    let _: () = call(&bus, "/", MOCK, "ConnectDevice", &("hci0", "AA:BB:CC:00:00:04"));
+    let _: () = call(
+        &bus,
+        "/",
+        MOCK,
+        "PairDevice",
+        &("hci0", "AA:BB:CC:00:00:04"),
+    );
+    let _: () = call(
+        &bus,
+        "/",
+        MOCK,
+        "ConnectDevice",
+        &("hci0", "AA:BB:CC:00:00:04"),
+    );
     // A battery level.
     let battery: HashMap<&str, Value<'_>> = HashMap::from([("Percentage", Value::from(87u8))]);
     let _: () = call(
@@ -79,7 +91,11 @@ fn lists_paired_and_nearby_devices() {
             ("Speaker", false, false)
         ]
     );
-    let speaker = s.devices.iter().find(|d| d.name == "Speaker").expect("Speaker");
+    let speaker = s
+        .devices
+        .iter()
+        .find(|d| d.name == "Speaker")
+        .expect("Speaker");
     assert_eq!(speaker.battery, Some(87));
     assert_eq!(speaker.address, "AA:BB:CC:00:00:02");
     // The template's devices are phones.
@@ -111,7 +127,13 @@ fn pairs_connects_and_forgets() {
         bt.connect("AA:BB:CC:00:00:01").unwrap_err().kind,
         ErrorKind::Refused
     );
-    let _: () = call(&bus, "/", MOCK, "ConnectDevice", &("hci0", "AA:BB:CC:00:00:01"));
+    let _: () = call(
+        &bus,
+        "/",
+        MOCK,
+        "ConnectDevice",
+        &("hci0", "AA:BB:CC:00:00:01"),
+    );
     assert!(bt.snapshot().expect("snapshot").devices[0].connected);
 
     bt.forget("AA:BB:CC:00:00:01").expect("forget");
@@ -125,14 +147,38 @@ fn power_visibility_and_discovery() {
     let bt = Bluetooth::new(&bus.bus()).expect("connect");
 
     bt.set_powered(false).expect("off");
-    assert!(!bt.snapshot().expect("snapshot").adapter.expect("adapter").powered);
+    assert!(
+        !bt.snapshot()
+            .expect("snapshot")
+            .adapter
+            .expect("adapter")
+            .powered
+    );
     bt.set_powered(true).expect("on");
-    assert!(bt.snapshot().expect("snapshot").adapter.expect("adapter").powered);
+    assert!(
+        bt.snapshot()
+            .expect("snapshot")
+            .adapter
+            .expect("adapter")
+            .powered
+    );
 
     bt.set_discoverable(true).expect("visible");
-    assert!(bt.snapshot().expect("snapshot").adapter.expect("adapter").discoverable);
+    assert!(
+        bt.snapshot()
+            .expect("snapshot")
+            .adapter
+            .expect("adapter")
+            .discoverable
+    );
     bt.set_discoverable(false).expect("hidden");
-    assert!(!bt.snapshot().expect("snapshot").adapter.expect("adapter").discoverable);
+    assert!(
+        !bt.snapshot()
+            .expect("snapshot")
+            .adapter
+            .expect("adapter")
+            .discoverable
+    );
 
     // The template's discovery needs a filter set first.
     let filter: HashMap<&str, Value<'_>> = HashMap::new();
@@ -144,9 +190,21 @@ fn power_visibility_and_discovery() {
         &(filter,),
     );
     bt.start_discovery().expect("start");
-    assert!(bt.snapshot().expect("snapshot").adapter.expect("adapter").discovering);
+    assert!(
+        bt.snapshot()
+            .expect("snapshot")
+            .adapter
+            .expect("adapter")
+            .discovering
+    );
     bt.stop_discovery().expect("stop");
-    assert!(!bt.snapshot().expect("snapshot").adapter.expect("adapter").discovering);
+    assert!(
+        !bt.snapshot()
+            .expect("snapshot")
+            .adapter
+            .expect("adapter")
+            .discovering
+    );
 }
 
 #[test]
@@ -154,9 +212,22 @@ fn junk_never_reaches_the_bus() {
     let Some(bus) = start() else { return };
     adapter(&bus);
     let bt = Bluetooth::new(&bus.bus()).expect("connect");
-    for bad in ["", "../org/bluez/hci0", "AA:BB:CC:00:00", "AA:BB:CC:00:00:ZZ"] {
-        assert_eq!(bt.connect(bad).unwrap_err().kind, ErrorKind::Refused, "{bad:?}");
-        assert_eq!(bt.forget(bad).unwrap_err().kind, ErrorKind::Refused, "{bad:?}");
+    for bad in [
+        "",
+        "../org/bluez/hci0",
+        "AA:BB:CC:00:00",
+        "AA:BB:CC:00:00:ZZ",
+    ] {
+        assert_eq!(
+            bt.connect(bad).unwrap_err().kind,
+            ErrorKind::Refused,
+            "{bad:?}"
+        );
+        assert_eq!(
+            bt.forget(bad).unwrap_err().kind,
+            ErrorKind::Refused,
+            "{bad:?}"
+        );
     }
     // A device that isn't there.
     assert_eq!(
@@ -182,9 +253,17 @@ fn device_names_are_safe_text() {
     device(&bus, "AA:BB:CC:00:00:02", &"x".repeat(500));
     let bt = Bluetooth::new(&bus.bus()).expect("connect");
     let s = bt.snapshot().expect("snapshot");
-    let evil = s.devices.iter().find(|d| d.address.ends_with("01")).expect("evil");
+    let evil = s
+        .devices
+        .iter()
+        .find(|d| d.address.ends_with("01"))
+        .expect("evil");
     assert_eq!(evil.name, "ev\u{FFFD}[31mil\u{FFFD}name");
-    let long = s.devices.iter().find(|d| d.address.ends_with("02")).expect("long");
+    let long = s
+        .devices
+        .iter()
+        .find(|d| d.address.ends_with("02"))
+        .expect("long");
     assert_eq!(long.name.chars().count(), 65);
 }
 
