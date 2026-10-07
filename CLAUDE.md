@@ -101,3 +101,20 @@ skip there is a failure.
    from that release's `symbols.txt`.
 4. Rebuild the dev image against that release's RPMs.
 5. Commit `Cargo.toml` and `Cargo.lock` together.
+
+## Moving the telamon-updater-core pin
+
+The Updates page's logic is `telamon-updater-core`, in the atlasos-updater
+repository (Telamon Updater's own Rust code: the system helper's client, the
+settings file, schedule, restart and locks, Flatpak updates, firmware, release
+notes). Cargo.toml pins it to a revision of that repository.
+
+1. Change `rev` of `telamon-updater-core` in `Cargo.toml` (a commit of
+   atlasos-updater that is on GitHub), then
+   `scripts/dev.sh cargo update -p telamon-updater-core`.
+2. Working on both at once: `TELAMON_UPDATER_SRC=<atlasos-updater checkout>
+   scripts/dev.sh ...` mounts it at `/updater-src`; point the dependency at
+   `path = "/updater-src/crates/telamon-updater-core"` while you do, and put
+   the git `rev` back before committing (Cargo.lock too).
+3. The tray's names (`SetWorking`, `Reload`) and the helper's D-Bus API are
+   Telamon Updater's: change them there first.
