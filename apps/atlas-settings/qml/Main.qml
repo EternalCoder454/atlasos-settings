@@ -41,6 +41,7 @@ AtlasWindow {
             "time-language": timeLanguagePage,
             "power": powerPage,
             "users": usersPage,
+            "privacy": privacyPage,
             "system": systemPage
         })
 
@@ -305,6 +306,18 @@ AtlasWindow {
     Component {
         id: usersPage
         UsersPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: privacyPage
+        PrivacyPage {
             entry: root.currentPage
             itemId: root.itemId
             pages: root.pages

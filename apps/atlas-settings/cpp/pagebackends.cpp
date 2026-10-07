@@ -1,5 +1,7 @@
 #include "pagebackends.h"
 
+#include "autostartconfig.h"
+#include "defaultapps.h"
 #include "localeconfig.h"
 #include "powerconfig.h"
 #include "screenlockconfig.h"
@@ -19,6 +21,10 @@ QObject *PageBackends::create(const QString &kind, QObject *parent)
         object = new PowerConfig;
     } else if (kind == QLatin1String("screenlock-config")) {
         object = new ScreenLockConfig;
+    } else if (kind == QLatin1String("autostart-config")) {
+        object = new AutostartConfig;
+    } else if (kind == QLatin1String("default-apps")) {
+        object = new DefaultApps;
     } else {
         object = static_cast<QObject *>(atlas_page_backend_new(kind.toUtf8().constData()));
     }

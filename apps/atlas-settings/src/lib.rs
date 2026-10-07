@@ -4,6 +4,7 @@
 
 mod backend;
 mod power_page;
+mod privacy_page;
 mod system_info;
 mod time_language;
 mod users_page;
@@ -46,6 +47,9 @@ pub unsafe extern "C" fn atlas_page_backend_new(kind: *const c_char) -> *mut c_v
             .into_raw()
             .cast(),
         b"users" => users_page::qobject::users_page_make_unique()
+            .into_raw()
+            .cast(),
+        b"privacy" => privacy_page::qobject::privacy_page_make_unique()
             .into_raw()
             .cast(),
         b"system" => system_info::qobject::system_info_make_unique()

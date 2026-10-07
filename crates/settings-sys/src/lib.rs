@@ -13,12 +13,14 @@
 pub mod accounts;
 pub mod bus;
 pub mod error;
+pub mod firewall;
 pub mod fprint;
 pub mod hostname;
 pub mod locale;
 pub mod power;
 pub mod sysinfo;
 pub mod timedate;
+pub mod updater;
 
 pub use bus::Bus;
 pub use error::{Error, ErrorKind};

@@ -23,6 +23,8 @@ find_package(KF6KIO REQUIRED)
 find_package(KF6GuiAddons REQUIRED)
 # Plasma's language and formats (plasma-localerc), written as its KCM does.
 find_package(KF6Config REQUIRED)
+# The installed apps (default apps, startup apps): KApplicationTrader.
+find_package(KF6Service REQUIRED)
 find_package(Corrosion REQUIRED)
 
 set(WORKSPACE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
@@ -75,6 +77,8 @@ qt_add_executable(atlas-settings-app
     cpp/localeconfig.cpp
     cpp/powerconfig.cpp
     cpp/screenlockconfig.cpp
+    cpp/autostartconfig.cpp
+    cpp/defaultapps.cpp
     cpp/pagebackends.cpp)
 set_target_properties(atlas-settings-app PROPERTIES OUTPUT_NAME atlas-settings)
 target_include_directories(atlas-settings-app PRIVATE "${ATLAS_UI_CRATE_DIR}/include")
@@ -98,13 +102,14 @@ qt_add_qml_module(atlas-settings-app
         qml/SystemPage.qml
         qml/PowerPage.qml
         qml/UsersPage.qml
+        qml/PrivacyPage.qml
         qml/TimeoutSheet.qml
 )
 
 target_link_libraries(atlas-settings-app PRIVATE
     atlas_settings
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore
+    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore KF6::Service
     # crypt(3), for the password hash AccountsService takes (settings-sys).
     crypt)
 
@@ -124,7 +129,10 @@ if(ATLAS_SETTINGS_TESTS)
     enable_testing()
     add_executable(configtests tests/configtests.cpp
         cpp/powerconfig.cpp
-        cpp/screenlockconfig.cpp)
-    target_link_libraries(configtests PRIVATE Qt6::Core Qt6::Test KF6::ConfigCore)
+        cpp/screenlockconfig.cpp
+        cpp/autostartconfig.cpp
+        cpp/defaultapps.cpp)
+    target_link_libraries(configtests PRIVATE Qt6::Core Qt6::Test
+        KF6::ConfigCore KF6::CoreAddons KF6::Service)
     add_test(NAME configtests COMMAND configtests)
 endif()

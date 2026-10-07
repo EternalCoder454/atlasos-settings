@@ -96,6 +96,12 @@ m.AddProperty("org.freedesktop.UPower.Device", "ChargeThresholdEnabled", False)
             {"Uid": 1001, "UserName": "grace", "RealName": "Grace Hopper", "AccountType": 1},
             {"Uid": 1002, "UserName": "kit", "RealName": "Kit Marlowe"}]}'
         ;;
+    firewalld)
+        mock "$templates/systemd1.py" org.freedesktop.systemd1
+        mock "$templates/firewalld.py" org.fedoraproject.FirewallD1 '{"DefaultZone": "AtlasOS",
+            "Zones": {"AtlasOS": {"Services": ["mdns", "samba-client", "steam-streaming", "ssh"], "Ports": [["8080", "tcp"]]}},
+            "Available": ["ssh", "mdns", "samba-client", "kdeconnect", "http", "https", "steam-streaming", "ftp", "syncthing"]}'
+        ;;
     fprintd)
         if [ "$scenario" = laptop ]; then
             mock "$templates/fprintd.py" net.reactivated.Fprint '{"Enrolled": ["right-index-finger", "left-thumb"]}'
