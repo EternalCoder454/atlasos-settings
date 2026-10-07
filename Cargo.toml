@@ -1,9 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/settings-registry", "crates/settings-sys", "apps/telamon-settings"]
+members = ["crates/settings-registry", "crates/settings-sys", "crates/systemsettings-shim", "apps/telamon-settings"]
 
 [workspace.package]
-version = "0.3.1"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/EternalCoder454/atlasos-settings"

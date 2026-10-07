@@ -4,7 +4,8 @@ Rust + Qt 6.11 + Kirigami (CXX-Qt) settings app for Telamon OS, a Fedora Kinoite
 44 bootc image (repo `~/Documents/Projects/AtlasOS/AtlasOS`). It replaces KDE
 System Settings: its own pages over the system's services, the KCMs it has no
 page for under Other Plasma Settings, and System Settings' entry points
-(`systemsettings`, KCMLauncher, the `kcm_*.desktop` launchers) at cutover.
+(`systemsettings`, KCMLauncher, the `kcm_*.desktop` launchers) since 0.4.0
+(the cutover).
 Read `docs/DESIGN.md` first: it fixes the layout, the threading rule, what is
 trusted, who owns what, and the budgets. Change it only together with the
 code that implements the change.
@@ -54,8 +55,10 @@ logging, crash reports), which Settings takes from there.
   KCM map and Other Plasma Settings read `crates/settings-registry`; never list pages
   or KCM names anywhere else.
 - **Don't edit the Telamon OS image.** Hand the Telamon OS session an RPM or a
-  commit to pin (`atlas-apps.lock`). Until cutover the desktop file stays
-  `NoDisplay=true` and nothing of KDE's is replaced.
+  commit to pin (`telamon-apps.lock`). Since 0.4.0 the desktop file is
+  visible and the `telamon-settings-systemsettings` subpackage replaces
+  plasma-systemsettings; the image's pins, scripts and migration for it are
+  the image session's.
 - Tests assert invariants and use fixtures (`crates/*/tests/fixtures`),
   never this machine's KCMs or services.
 - Commits are authored as

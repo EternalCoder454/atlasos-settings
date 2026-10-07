@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           telamon-settings
-Version:        0.3.1
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        Settings, the settings app of Telamon OS
 License:        MIT
@@ -95,6 +95,30 @@ time, language, keyboard, mouse and touchpad, printers, default apps, app
 permissions, privacy, updates and system information. Settings it has no page
 for open in Plasma's own settings modules.
 
+%package systemsettings
+Summary:        Telamon Settings in place of KDE System Settings
+Requires:       %{name}%{?_isa} = %{version}-%{release}
+# kcmshell6, which the systemsettings command starts for the settings modules
+# Settings has no page for
+Requires:       kf6-kcmutils
+# It takes the place of Fedora's plasma-systemsettings (the same /usr/bin/systemsettings
+# and systemsettings.desktop, which Plasma's KCMLauncher, tray applets and
+# other packages' scripts start). Other packages require the name
+# (plasma-desktop, colord-kde and kcm-plasmalogin, by name and with the
+# architecture), so this provides it: at a version no Requires: from KDE
+# can ask more of, and the Obsoletes covers every version Fedora ships, so a
+# later plasma-systemsettings never comes back beside this.
+Obsoletes:      plasma-systemsettings < 100
+Provides:       plasma-systemsettings = 99
+Provides:       plasma-systemsettings%{?_isa} = 99
+
+%description systemsettings
+Replaces KDE's System Settings with Telamon Settings: /usr/bin/systemsettings
+opens Settings for a settings module it has a page for (systemsettings
+kcm_kscreen) and Plasma's kcmshell6 for any other (systemsettings kcm_trash),
+and the hidden systemsettings.desktop and kdesystemsettings.desktop start
+Settings, so Plasma's KCMLauncher, the tray applets and old pins keep working.
+
 %prep
 %autosetup -n telamon-settings-%{version}
 
@@ -142,6 +166,11 @@ install -Dpm0644 apps/telamon-settings/data/net.eterneon.atlas.settings.desktop 
     %{buildroot}%{_datadir}/applications/net.eterneon.atlas.settings.desktop
 
 %check
+# The page registry's and the systemsettings command's own tests (no Qt): a
+# separate debug build of those two crates, beside the release build above.
+export CARGO_HOME=${CARGO_HOME:-%{_builddir}/cargo-home}
+CARGO_TARGET_DIR=%{_builddir}/cargo-test-target cargo test --locked \
+    -p settings-registry -p systemsettings-shim
 # No path into the build tree (checked as well as set: see %%build).
 # grep: 0 = found, 1 = not found, anything else (no binary) fails too.
 for path in "%{_builddir}" %{?_telamon_build_cache:"%{_telamon_build_cache}"}; do
@@ -156,7 +185,30 @@ done
 # Light in a throwaway kwinrc; the sound test needs a sound server and skips).
 QT_QPA_PLATFORM=offscreen %ctest
 desktop-file-validate %{buildroot}%{_datadir}/applications/net.eterneon.telamon.settings.desktop \
-    %{buildroot}%{_datadir}/applications/net.eterneon.atlas.settings.desktop
+    %{buildroot}%{_datadir}/applications/net.eterneon.atlas.settings.desktop \
+    %{buildroot}%{_datadir}/applications/systemsettings.desktop \
+    %{buildroot}%{_datadir}/applications/kdesystemsettings.desktop
+# Settings is in the menu and the Launcher finds it; the stand-ins for System
+# Settings are hidden.
+if grep -q '^NoDisplay=true' %{buildroot}%{_datadir}/applications/net.eterneon.telamon.settings.desktop; then
+    echo "net.eterneon.telamon.settings.desktop is still hidden" >&2
+    exit 1
+fi
+for f in systemsettings kdesystemsettings; do
+    grep -qx 'NoDisplay=true' %{buildroot}%{_datadir}/applications/$f.desktop
+    grep -qx 'Exec=telamon-settings' %{buildroot}%{_datadir}/applications/$f.desktop
+done
+# The Launcher's search index and the command that stands in for System Settings.
+grep -q '^{"version":1,"app":"net.eterneon.telamon.settings"' %{buildroot}%{_datadir}/telamon-settings/search-index.json
+grep -q '"link":"displays/night-light"' %{buildroot}%{_datadir}/telamon-settings/search-index.json
+%{buildroot}%{_bindir}/systemsettings --version | grep -q '^systemsettings %{version} '
+# (`!` would not stop the script under set -e.)
+rc=0
+%{buildroot}%{_bindir}/systemsettings '../../bin/sh' 2>/dev/null || rc=$?
+if [ "$rc" != 2 ]; then
+    echo "systemsettings accepted a path as a module (status $rc)" >&2
+    exit 1
+fi
 appstream-util validate-relax --nonet \
     %{buildroot}%{_datadir}/metainfo/net.eterneon.telamon.settings.metainfo.xml
 
@@ -166,11 +218,32 @@ appstream-util validate-relax --nonet \
 %{_bindir}/atlas-settings
 %{_datadir}/applications/net.eterneon.telamon.settings.desktop
 %{_datadir}/applications/net.eterneon.atlas.settings.desktop
+%{_datadir}/dbus-1/services/net.eterneon.telamon.settings.service
+%dir %{_datadir}/telamon-settings
+%{_datadir}/telamon-settings/search-index.json
 %{_datadir}/metainfo/net.eterneon.telamon.settings.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/net.eterneon.telamon.settings.svg
 %config(noreplace) %{_sysconfdir}/dnf/protected.d/telamon-settings.conf
 
+%files systemsettings
+%{_bindir}/systemsettings
+%{_datadir}/applications/systemsettings.desktop
+%{_datadir}/applications/kdesystemsettings.desktop
+
 %changelog
+* Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.0-1
+- Settings replaces KDE's System Settings. It is in the menu and the Launcher
+  now (the desktop file is no longer hidden), and the Launcher finds every
+  page and setting (/usr/share/telamon-settings/search-index.json, written
+  from the page registry) and opens it, also when Settings is not running
+  yet (ActivateAction "open", "open-app"; D-Bus activation).
+- New package telamon-settings-systemsettings, which replaces
+  plasma-systemsettings: /usr/bin/systemsettings opens Settings for a
+  settings module it has a page for and kcmshell6 for any other, and the
+  hidden systemsettings.desktop and kdesystemsettings.desktop start
+  Settings, so Plasma's KCMLauncher, the tray applets and old pins keep
+  working.
+
 * Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.3.1-1
 - The screen edge glow is asked for only while the OS image changes (an
   update, a channel switch, a rollback), not for app or firmware updates.

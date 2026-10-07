@@ -10,6 +10,9 @@
 //! telamon-settings --search <text>         search
 //! ```
 //!
+//! and the `org.freedesktop.Application.ActivateAction` calls other
+//! programs make (the Launcher's `open` and `open-app`, [`action_args`]).
+//!
 //! Everything here is untrusted (any program can start Settings with any
 //! arguments): lengths are capped, control characters refused, and page and
 //! setting IDs must be ones the registry has.
@@ -64,7 +67,9 @@ fn refuse(out: &mut Vec<Refused>, arg: &str, reason: &'static str) {
     });
 }
 
-fn clean(arg: &str, max: usize) -> Result<(), &'static str> {
+/// Whether `arg` is acceptable text: at most `max` bytes and no control
+/// characters. The reason when it is not.
+pub fn clean(arg: &str, max: usize) -> Result<(), &'static str> {
     if arg.len() > max {
         Err("too long")
     } else if arg.chars().any(char::is_control) {
@@ -213,6 +218,75 @@ pub fn parse(args: &[String]) -> (Vec<Request>, Vec<Refused>) {
     (out, refused)
 }
 
+/// Longest link in the search index, in bytes (the Launcher's cap too).
+pub const MAX_LINK: usize = 128;
+/// Longest desktop file ID `open-app` accepts, in bytes.
+pub const MAX_DESKTOP_ID: usize = 200;
+
+/// Whether `link` is one the search index can hold: `page` or `page/item`
+/// style, `[a-z0-9][a-z0-9-]*` segments joined by `/`, at most
+/// [`MAX_LINK`] bytes.
+pub fn valid_link(link: &str) -> bool {
+    !link.is_empty()
+        && link.len() <= MAX_LINK
+        && link.split('/').all(|seg| {
+            let b = seg.as_bytes();
+            b.first()
+                .is_some_and(|f| f.is_ascii_lowercase() || f.is_ascii_digit())
+                && b.iter()
+                    .all(|&c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+        })
+}
+
+/// Whether `id` can be a desktop file ID (`org.example.App.desktop`): 1 to
+/// [`MAX_DESKTOP_ID`] of `A-Z a-z 0-9 . _ - +`, not starting with `-` or `.`.
+pub fn valid_desktop_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= MAX_DESKTOP_ID
+        && !id.starts_with(['-', '.'])
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b'+'))
+}
+
+/// The launch arguments (without the program name) that an
+/// `org.freedesktop.Application.ActivateAction(action, [parameter])` call
+/// stands for, and what was refused.
+///
+/// - `open` with a link from the search index (`displays`,
+///   `displays/night-light`): that page, scrolled to that setting.
+/// - `open-app` with an app's desktop file ID: the Apps page, at App
+///   Permissions (the ID only has to be well formed; permissions are listed
+///   for Flatpak apps and picked there).
+/// - Any other action asks for nothing more than the window: no arguments
+///   and nothing refused (what a link or ID is not is reported for the two
+///   above).
+pub fn action_args(action: &str, parameter: Option<&str>) -> (Vec<String>, Vec<Refused>) {
+    let mut refused = Vec::new();
+    let args = match (action, parameter) {
+        ("open", Some(link)) if valid_link(link) => link.split('/').map(str::to_string).collect(),
+        ("open", Some(link)) => {
+            refuse(&mut refused, link, "not a link");
+            Vec::new()
+        }
+        ("open-app", Some(id)) if valid_desktop_id(id) => {
+            vec!["apps".to_string(), "permissions".to_string()]
+        }
+        ("open-app", Some(id)) => {
+            refuse(&mut refused, id, "not a desktop file ID");
+            Vec::new()
+        }
+        ("open" | "open-app", None) => {
+            refuse(&mut refused, action, "needs a parameter");
+            Vec::new()
+        }
+        // Another program's idea of an action: the window only, with
+        // nothing to tell the user about.
+        _ => Vec::new(),
+    };
+    (args, refused)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -343,5 +417,102 @@ mod tests {
         let flood: Vec<&str> = std::iter::repeat_n(huge.as_str(), 10_000).collect();
         let (_, bad) = p(&flood);
         assert!(bad[0].arg.chars().count() < 80);
+    }
+
+    fn act(action: &str, parameter: Option<&str>) -> (Vec<String>, Vec<Refused>) {
+        action_args(action, parameter)
+    }
+
+    #[test]
+    fn open_links() {
+        assert_eq!(
+            act("open", Some("displays")),
+            (vec!["displays".into()], vec![])
+        );
+        let (args, bad) = act("open", Some("displays/night-light"));
+        assert_eq!(args, ["displays", "night-light"]);
+        assert!(bad.is_empty());
+        // What the arguments then mean:
+        assert_eq!(
+            parse(&args).0,
+            vec![Request::Page {
+                page: "displays",
+                item: Some("night-light")
+            }]
+        );
+        // Not links: the window only, and a reason.
+        for bad_link in [
+            "",
+            "Displays",
+            "a//b",
+            "/a",
+            "a/",
+            "-a",
+            "a/-b",
+            "a b",
+            "../x",
+            "a_b",
+            "--kcm",
+            "x\u{1b}[2J",
+        ] {
+            let (args, bad) = act("open", Some(bad_link));
+            assert!(args.is_empty(), "{bad_link:?}");
+            assert_eq!(bad[0].reason, "not a link", "{bad_link:?}");
+        }
+        let long = "a".repeat(MAX_LINK + 1);
+        assert_eq!(act("open", Some(&long)).1[0].reason, "not a link");
+        assert!(valid_link(&"a".repeat(MAX_LINK)));
+        assert_eq!(act("open", None).1[0].reason, "needs a parameter");
+        // A link for a page or setting that does not exist still opens the
+        // window, at the first page (parse reports the rest).
+        let (args, _) = act("open", Some("nope/nothing"));
+        assert_eq!(parse(&args).0, vec![Request::Home]);
+    }
+
+    #[test]
+    fn open_app() {
+        for id in [
+            "org.kde.kate.desktop",
+            "com.brave.Browser.desktop",
+            "a-b_c+d.desktop",
+        ] {
+            let (args, bad) = act("open-app", Some(id));
+            assert!(bad.is_empty(), "{id}");
+            assert_eq!(
+                parse(&args).0,
+                vec![Request::Page {
+                    page: "apps",
+                    item: Some("permissions")
+                }]
+            );
+        }
+        for id in [
+            "",
+            "-x.desktop",
+            ".hidden",
+            "a b",
+            "a/b.desktop",
+            "a;b",
+            "é.desktop",
+            "a\nb",
+        ] {
+            let (args, bad) = act("open-app", Some(id));
+            assert!(args.is_empty(), "{id:?}");
+            assert_eq!(bad[0].reason, "not a desktop file ID", "{id:?}");
+        }
+        assert_eq!(
+            act("open-app", Some(&"x".repeat(MAX_DESKTOP_ID + 1))).1[0].reason,
+            "not a desktop file ID"
+        );
+        assert_eq!(act("open-app", None).1[0].reason, "needs a parameter");
+    }
+
+    #[test]
+    fn other_actions_only_raise() {
+        for action in ["new-window", "", "Open", &"z".repeat(5000)] {
+            for parameter in [None, Some("displays"), Some("\u{1b}")] {
+                assert_eq!(act(action, parameter), (vec![], vec![]), "{action:.20}");
+            }
+        }
     }
 }

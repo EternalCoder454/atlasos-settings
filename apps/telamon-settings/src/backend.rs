@@ -21,6 +21,13 @@ pub mod qobject {
         #[qinvokable]
         fn activate(self: Pin<&mut Backend>, args: &QStringList);
 
+        /// Handles an `org.freedesktop.Application.ActivateAction` call: the
+        /// Launcher's `open` (a link of the search index) and `open-app`
+        /// (a desktop file ID). `parameter` is "" when the call had none.
+        #[qinvokable]
+        #[cxx_name = "activateAction"]
+        fn activate_action(self: Pin<&mut Backend>, action: &QString, parameter: &QString);
+
         /// The pages in sidebar order, as JSON: `[{id, title, symbol, kind,
         /// kcm, items: [{id, title, kcm, advanced}], related: [page id]}]`.
         /// `kind` is `native` or `more` (Other Plasma Settings, not in the sidebar); `kcm` the
@@ -95,7 +102,29 @@ impl qobject::Backend {
                 }
             })
             .collect();
-        let (requests, refused) = launch::parse(&args);
+        self.handle(args, Vec::new());
+    }
+
+    pub fn activate_action(self: Pin<&mut Self>, action: &QString, parameter: &QString) {
+        // Another program's text: capped before anything reads it.
+        let cap = |q: &QString| {
+            if q.len() > launch::MAX_ARG as isize {
+                "\u{FFFD}".repeat(launch::MAX_ARG + 1)
+            } else {
+                q.to_string()
+            }
+        };
+        let action = cap(action);
+        let parameter = cap(parameter);
+        let (args, refused) =
+            launch::action_args(&action, Some(parameter.as_str()).filter(|p| !p.is_empty()));
+        self.handle(args, refused);
+    }
+
+    /// Reports what was refused, then asks for what `args` mean.
+    fn handle(mut self: Pin<&mut Self>, args: Vec<String>, earlier: Vec<launch::Refused>) {
+        let (requests, mut refused) = launch::parse(&args);
+        refused.splice(0..0, earlier);
         for r in &refused {
             log::warn!("ignored argument {}: {}", r.arg, r.reason);
             self.as_mut()

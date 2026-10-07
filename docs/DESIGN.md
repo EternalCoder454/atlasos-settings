@@ -55,9 +55,8 @@ checks where it can:
 Page IDs of earlier versions still open where their settings went
 (`pages::RENAMED`).
 
-Until cutover Settings installs beside System Settings, hidden from the menu
-(`NoDisplay=true`), and replaces nothing of KDE's. At cutover a subpackage
-takes over `systemsettings` (see "Entry points").
+Settings is in the menu and the Launcher, and since the 0.4.0 cutover a
+subpackage takes over `systemsettings` (see "Entry points").
 
 ## Layout
 
@@ -65,8 +64,13 @@ takes over `systemsettings` (see "Entry points").
   (`pages.rs`: pages, the settings on each page, which fold under
   Advanced, and the KCMs they answer for), KCM names and where they land (`kcm.rs`), search over pages
   and settings (`search.rs`), and launch arguments (`launch.rs`). The
-  sidebar, search, deep links, Other Plasma Settings and the future `systemsettings`
-  shim and KRunner runner all read it, so they can't drift apart.
+  sidebar, search, deep links, Other Plasma Settings, the `systemsettings`
+  shim and the Launcher's search index all read it, so they can't drift
+  apart. `index.rs` writes that index (`src/bin/gen-search-index.rs`, run by
+  the package build) and `launch.rs` also reads the `ActivateAction` calls
+  the Launcher makes with it.
+- `crates/systemsettings-shim`: no Qt. `/usr/bin/systemsettings` (see "Entry
+  points"): `plan()` decides, `main.rs` replaces the process.
 - `crates/settings-sys`: no Qt. zbus 5 clients for the system's services,
   one module per service, with timeouts and plain-language errors
   (`error.rs`). Tested against python-dbusmock on a private bus.
@@ -478,25 +482,54 @@ checks that shell syntax in `--args` runs nothing). They are found in
 starts once, and at most 5 programs start in any 10 s, since other programs'
 links can ask for them.
 
-## Entry points (at cutover)
+## Entry points
 
-Today `systemsettings <kcm>` (KCMLauncher, the tray applets, the `kcm_*`
-launchers, the image's scripts) opens KDE's System Settings. At cutover a
-subpackage `telamon-settings-systemsettings` `Obsoletes:` and `Provides:`
-plasma-systemsettings and installs:
+`systemsettings <kcm>` (Plasma's KCMLauncher, the tray applets, the image's
+scripts) used to open KDE's System Settings. Since the 0.4.0 cutover the
+subpackage `telamon-settings-systemsettings` takes it over: it `Obsoletes:`
+plasma-systemsettings (every version below 100) and `Provides:` its name, with
+and without the architecture (plasma-desktop, colord-kde and kcm-plasmalogin
+require it), at version 99 so no versioned `Requires:` from KDE can ask more.
+Both packages own `/usr/bin/systemsettings`, so the old one has to go, and
+the `Obsoletes:` does that in the same transaction. The subpackage installs:
 
-1. `/usr/bin/systemsettings`, a small Rust binary that validates its argv
-   with the same registry code and execs `telamon-settings --kcm <name>` for a
-   KCM Settings has a page for, else `kcmshell6 <name>`. No shell, no PATH
-   lookup beyond the two fixed binaries.
+1. `/usr/bin/systemsettings`, a small Rust binary (`crates/systemsettings-shim`)
+   that validates its argv with the registry's `launch::parse` and execs
+   `/usr/bin/telamon-settings --kcm <name>` for a KCM Settings has a page for
+   (no arguments for System Settings' own start page), else
+   `/usr/bin/kcmshell6 <name> [--args=<text>]`. Both are absolute paths: no
+   shell, no `PATH` lookup. It accepts what KDE's `systemsettings` does with
+   a module (`kcm_x`, `kcm_x.desktop`, a plugin path, `--args <text>`, `--help`,
+   `--version`) and refuses anything else with status 2 and one line on the
+   standard error, rather than guess. The text for a page's `--args` is not
+   passed on (a page has no use for it). Exec to hand-off is within 5 ms
+   (about 0.4 ms measured in a debug build, `tests/process.rs`).
 2. Hidden `systemsettings.desktop` and `kdesystemsettings.desktop` that
    launch Settings, so KCMLauncher keeps finding System Settings and old pins
-   keep working.
+   keep working (`StartupWMClass` is Settings' own, so a window groups with
+   such a pin).
+
+What goes with plasma-systemsettings: its KRunner plugin (the Launcher
+replaces KRunner), its category files (Other Plasma Settings groups by the
+KCMs' own metadata) and its zsh completion.
 
 The Telamon OS Launcher, which replaces KRunner, finds Settings pages through
-`/usr/share/telamon-settings/search-index.json`, generated from the registry,
-and opens them with `org.freedesktop.Application.ActivateAction` (`open`,
-`open-app`). This is planned for F1; the format is in the Plan note.
+`/usr/share/telamon-settings/search-index.json` (format version 1: one entry
+per page and per setting, `link` = `page` or `page/item`, text in locale maps
+with a `C` fallback; `index.rs`, written at build time from the registry), and
+opens them with `org.freedesktop.Application.ActivateAction` on
+`net.eterneon.telamon.settings`:
+
+- `open` `[<link>]`: that page, scrolled to that setting;
+- `open-app` `[<desktop file ID>]`: the Apps page at App Permissions (the
+  ID is only checked for form; permissions are picked there for Flatpak
+  apps).
+
+Both are read in Rust (`launch::action_args`) like any launch argument, so a
+link that is not one is refused and the window only comes forward. When
+Settings is not running, the session bus starts it
+(`net.eterneon.telamon.settings.service`, `DBusActivatable=true`) and the call
+reaches it once it is up.
 
 The image's own changes (menu entry, dock pin, scripts) are the Telamon OS
 session's. Direct `kcmshell6` calls (Dolphin's trash, KNotifications) keep

@@ -7,10 +7,12 @@ Exec=telamon-settings
 Icon=net.eterneon.telamon.settings
 Terminal=false
 Categories=Qt;KDE;Settings;
-Keywords=settings;preferences;configuration;control center;system settings;wifi;network;bluetooth;display;sound;appearance;wallpaper;power;users;keyboard;mouse;
+# What people type to find it, and what each page is called, so the Launcher
+# (and any menu search) finds Settings by any of them.
+Keywords=settings;system settings;preferences;options;configuration;configure;control panel;control center;wifi;wi-fi;network;internet;ethernet;vpn;bluetooth;devices;printer;display;displays;monitor;screen;resolution;night light;sound;audio;volume;speaker;microphone;keyboard;mouse;touchpad;shortcuts;appearance;theme;dark mode;wallpaper;accent;dock;notifications;apps;default apps;startup;privacy;security;firewall;permissions;users;accounts;password;power;battery;sleep;accessibility;time;date;language;region;update;updates;about;
 StartupNotify=true
 SingleMainWindow=true
 X-KDE-StartupNotify=true
-# Hidden until Settings replaces System Settings in the image (the Telamon OS
-# session's cutover); until then it is installed for testing only.
-NoDisplay=true
+# The Launcher's deep links (ActivateAction) start it through the session bus
+# when it is not running (net.eterneon.telamon.settings.service).
+DBusActivatable=true

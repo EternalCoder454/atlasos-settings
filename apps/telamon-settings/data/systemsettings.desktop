@@ -1,0 +1,17 @@
+# Hidden stand-in for KDE's System Settings (telamon-settings-systemsettings
+# replaces plasma-systemsettings): KCMLauncher, the tray applets and old
+# dock or menu pins look it up by this name. It starts Telamon Settings.
+[Desktop Entry]
+Type=Application
+Name=Telamon Settings
+GenericName=System Settings
+Comment=Set up Wi-Fi, displays, sound, appearance and more
+Exec=telamon-settings
+Icon=net.eterneon.telamon.settings
+Terminal=false
+Categories=Qt;KDE;Settings;
+StartupNotify=true
+StartupWMClass=net.eterneon.telamon.settings
+SingleMainWindow=true
+X-KDE-StartupNotify=true
+NoDisplay=true
