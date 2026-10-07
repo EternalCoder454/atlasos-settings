@@ -435,7 +435,7 @@ the old window's backend without its crash report screens.
   notifications' actions); `kcm_updates` is the page; the System page's
   related links lead to it.
 - **Fixtures**: `TELAMON_UPDATER_FIXTURES=<dir>` (a debug or `fixtures`
-  build; the states are in the Updater repo, `apps/telamon-updater/fixtures-states`
+  build; the states are in the Updater repo, `crates/telamon-updater-core/fixtures-states`
   and are copied to `apps/telamon-settings/fixtures-states` for the smoke
   runs) shows the page with a banner "Developer test data" and
   never touches the helper, Flatpak, fwupd or the user's settings file.
