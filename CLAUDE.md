@@ -3,7 +3,7 @@
 Rust + Qt 6.11 + Kirigami (CXX-Qt) settings app for AtlasOS, a Fedora Kinoite
 44 bootc image (repo `~/Documents/Projects/AtlasOS/AtlasOS`). It replaces KDE
 System Settings: its own pages over the system's services, the KCMs it has no
-page for under More Settings, and System Settings' entry points
+page for under Other Plasma Settings, and System Settings' entry points
 (`systemsettings`, KCMLauncher, the `kcm_*.desktop` launchers) at cutover.
 Read `docs/DESIGN.md` first: it fixes the layout, the threading rule, what is
 trusted, who owns what, and the budgets. Change it only together with the
@@ -51,7 +51,7 @@ logging, crash reports), which Settings takes from there.
   that exists at the pinned release (`fw-src/api/atlas-ui.api` at the tag,
   not "Since 1.5.0" members).
 - **The page registry is the one list.** Sidebar, search, deep links, the
-  KCM map and More Settings read `crates/settings-registry`; never list pages
+  KCM map and Other Plasma Settings read `crates/settings-registry`; never list pages
   or KCM names anywhere else.
 - **Don't edit the AtlasOS image.** Hand the AtlasOS session an RPM or a
   commit to pin (`atlas-apps.lock`). Until cutover the desktop file stays

@@ -1,6 +1,7 @@
 //! Invariants of the page table.
 
-use settings_registry::{Group, PAGES};
+use settings_registry::pages::{self, RENAMED};
+use settings_registry::{Kind, PAGES};
 use std::collections::HashSet;
 
 fn is_id(s: &str) -> bool {
@@ -38,46 +39,74 @@ fn ids_are_unique_and_plain() {
     }
 }
 
+/// The sidebar: few pages, in this order (docs/DESIGN.md, "Pages").
 #[test]
-fn groups_are_contiguous_and_in_order() {
-    let order: Vec<Group> = PAGES.iter().map(|p| p.group).collect();
-    let mut groups = order.clone();
-    groups.dedup();
+fn the_sidebar_is_short() {
+    let sidebar: Vec<_> = PAGES
+        .iter()
+        .filter(|p| p.kind != Kind::MoreSettings)
+        .map(|p| p.id)
+        .collect();
     assert_eq!(
-        groups,
-        Group::ALL.to_vec(),
-        "every group once, in sidebar order"
+        sidebar,
+        [
+            "home",
+            "network",
+            "devices",
+            "displays",
+            "sound",
+            "input",
+            "appearance",
+            "notifications",
+            "apps",
+            "privacy",
+            "users",
+            "power",
+            "accessibility",
+            "time-language",
+            "system",
+        ]
     );
+    assert!(pages::page("more").is_some());
+    // Every page looks different in the sidebar.
+    let mut symbols = HashSet::new();
+    for p in PAGES {
+        assert!(
+            symbols.insert(p.symbol),
+            "{}: symbol {} twice",
+            p.id,
+            p.symbol
+        );
+    }
+}
+
+/// A page shows at most six settings before its Advanced section.
+#[test]
+fn pages_show_few_settings_unfolded() {
+    for p in PAGES {
+        let shown = p.items.iter().filter(|i| !i.advanced).count();
+        assert!(shown <= 6, "{} shows {shown} settings unfolded", p.id);
+        // Advanced comes last, so the fold is one section.
+        let first_adv = p.items.iter().position(|i| i.advanced);
+        if let Some(n) = first_adv {
+            assert!(
+                p.items[n..].iter().all(|i| i.advanced),
+                "{}: an unfolded setting after Advanced",
+                p.id
+            );
+        }
+    }
 }
 
 #[test]
-fn the_planned_pages_are_there() {
-    let ids: Vec<_> = PAGES.iter().map(|p| p.id).collect();
-    for want in [
-        "network",
-        "bluetooth",
-        "firewall",
-        "displays",
-        "sound",
-        "printers",
-        "keyboard",
-        "mouse",
-        "power",
-        "appearance",
-        "desktop",
-        "notifications",
-        "default-apps",
-        "app-permissions",
-        "users",
-        "privacy",
-        "accessibility",
-        "datetime",
-        "region",
-        "updates",
-        "about",
-        "more",
-    ] {
-        assert!(ids.contains(&want), "{want}");
+fn renamed_pages_land_on_real_pages() {
+    for &(old, to, item) in RENAMED {
+        assert!(pages::page(old).is_none(), "{old} is still a page");
+        let p = pages::page(to).unwrap_or_else(|| panic!("{old}: no page {to}"));
+        if let Some(i) = item {
+            assert!(p.item(i).is_some(), "{old}: no {to}/{i}");
+        }
+        assert_eq!(pages::find(old, None).map(|(p, _)| p.id), Some(to));
     }
 }
 

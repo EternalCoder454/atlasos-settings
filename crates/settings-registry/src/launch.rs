@@ -187,19 +187,19 @@ pub fn parse(args: &[String]) -> (Vec<Request>, Vec<Refused>) {
 
     let mut pos = positional.into_iter();
     if let Some(p) = pos.next() {
-        match pages::page(p) {
+        // Page IDs of earlier versions still work (pages::RENAMED).
+        let wanted = pos.next();
+        match pages::find(p, wanted) {
             None => refuse(&mut refused, p, "no such page"),
-            Some(page) => {
-                let item = pos.next().and_then(|i| match page.item(i) {
-                    Some(item) => Some(item.id),
-                    None => {
-                        refuse(&mut refused, i, "no such setting on that page");
-                        None
-                    }
-                });
+            Some((page, item)) => {
+                if let Some(i) = wanted
+                    && page.item(i).is_none()
+                {
+                    refuse(&mut refused, i, "no such setting on that page");
+                }
                 out.push(Request::Page {
                     page: page.id,
-                    item,
+                    item: item.map(|i| i.id),
                 });
             }
         }
@@ -233,8 +233,13 @@ mod tests {
             p(&["displays", "night-light"]).0,
             vec![page("displays", Some("night-light"))]
         );
-        assert_eq!(p(&["--page", "about"]).0, vec![page("about", None)]);
-        assert_eq!(p(&["--page=about"]).0, vec![page("about", None)]);
+        assert_eq!(p(&["--page", "system"]).0, vec![page("system", None)]);
+        assert_eq!(p(&["--page=system"]).0, vec![page("system", None)]);
+        // Earlier page IDs land where their page went.
+        assert_eq!(p(&["about"]).0, vec![page("system", None)]);
+        assert_eq!(p(&["mouse"]).0, vec![page("input", Some("speed"))]);
+        assert_eq!(p(&["mouse", "tap"]).0, vec![page("input", Some("tap"))]);
+        assert_eq!(p(&["printers"]).0, vec![page("devices", Some("printers"))]);
         let (r, bad) = p(&["displays", "nope"]);
         assert_eq!(r, vec![page("displays", None)]);
         assert_eq!(bad.len(), 1);
@@ -250,8 +255,8 @@ mod tests {
     fn empty_arguments_ask_for_nothing() {
         assert_eq!(p(&[""]), (vec![Request::Home], vec![]));
         assert_eq!(
-            p(&["", " ", "bluetooth"]),
-            (vec![page("bluetooth", None)], vec![])
+            p(&["", " ", "devices"]),
+            (vec![page("devices", None)], vec![])
         );
     }
 

@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import Atlas.Ui
 
-// Settings' window: the pages in groups down a sidebar, with a search over
+// Settings' window: a short list of pages down a sidebar, with a search over
 // pages and the settings on them, and the page beside it.
 AtlasWindow {
     id: root
@@ -18,8 +18,10 @@ AtlasWindow {
     // The installed KCMs, for More Settings (cpp/kcmcatalog.h).
     required property var kcmCatalog
 
-    // The pages in sidebar order (settings-registry), read once.
+    // The pages in sidebar order (settings-registry), read once. Other
+    // Plasma Settings ("more") opens from System, not the sidebar.
     readonly property var pages: JSON.parse(backend.pagesJson())
+    readonly property var sidebarPages: pages.filter(p => p.kind !== "more")
     // The page shown, and the setting on it a link asked for ("" for none).
     property string pageId: ""
     property string itemId: ""
@@ -29,7 +31,7 @@ AtlasWindow {
     property string notice: ""
 
     // The first page of a new install.
-    readonly property string firstPage: "network"
+    readonly property string firstPage: "home"
 
     title: AtlasApp.name
     width: Kirigami.Units.gridUnit * 56
@@ -41,37 +43,20 @@ AtlasWindow {
     LayoutMirroring.enabled: Qt.locale().textDirection === Qt.RightToLeft
     LayoutMirroring.childrenInherit: true
 
-    function pagesIn(group: string): var {
-        return pages.filter(p => p.group === group);
-    }
-
-    function groupTitle(group: string): string {
-        return pages.find(p => p.group === group)?.groupTitle ?? "";
-    }
-
-    // Shows page `id`, at setting `item`. With `launch`, a page whose
-    // settings are in another window (Printers, Updates) opens that window:
-    // for a click or a link, not when the last page comes back at start.
-    function openPage(id: string, item: string, launch: bool) {
-        const p = pages.find(x => x.id === id);
-        if (!p)
+    // Shows page `id` from its top, or at setting `item`.
+    function openPage(id: string, item: string) {
+        if (!pages.some(p => p.id === id))
             return;
         searchField.text = "";
         pageId = id;
         itemId = item;
         saved.setValue("Page", id);
-        if (!launch)
-            return;
-        if (p.kind === "kcm")
-            openKcm(p.target, "");
-        else if (p.kind === "app")
-            run([p.target]);
     }
 
     // The page shown last time, or the first page.
     function openHome() {
         const last = saved.value("Page", firstPage);
-        openPage(pages.some(p => p.id === last) ? last : firstPage, "", false);
+        openPage(pages.some(p => p.id === last) ? last : firstPage, "");
     }
 
     function openKcm(name: string, args: string) {
@@ -100,7 +85,8 @@ AtlasWindow {
         text: modelData.title
         symbol: Symbols.codepoint(modelData.symbol)
         selected: !root.searching && root.pageId === modelData.id
-        onClicked: root.openPage(modelData.id, "", true)
+        // Always the page's top, never a spot left from an earlier visit.
+        onClicked: root.openPage(modelData.id, "")
     }
 
     AtlasSettings {
@@ -113,10 +99,10 @@ AtlasWindow {
         function onRequested(kind: string, first: string, second: string) {
             switch (kind) {
             case "page":
-                root.openPage(first, second, true);
+                root.openPage(first, second);
                 break;
             case "kcm":
-                root.openPage("more", "", false);
+                root.openPage("more", "");
                 root.openKcm(first, second);
                 break;
             case "search":
@@ -174,52 +160,8 @@ AtlasWindow {
                 Layout.fillHeight: true
                 compact: root.sidebarCollapsed
 
-                NavHeading {
-                    text: root.groupTitle("connections")
-                    compact: sidebar.compact
-                }
                 Repeater {
-                    model: root.pagesIn("connections")
-                    NavItem {}
-                }
-                NavHeading {
-                    text: root.groupTitle("devices")
-                    compact: sidebar.compact
-                }
-                Repeater {
-                    model: root.pagesIn("devices")
-                    NavItem {}
-                }
-                NavHeading {
-                    text: root.groupTitle("personalization")
-                    compact: sidebar.compact
-                }
-                Repeater {
-                    model: root.pagesIn("personalization")
-                    NavItem {}
-                }
-                NavHeading {
-                    text: root.groupTitle("apps")
-                    compact: sidebar.compact
-                }
-                Repeater {
-                    model: root.pagesIn("apps")
-                    NavItem {}
-                }
-                NavHeading {
-                    text: root.groupTitle("accounts-privacy")
-                    compact: sidebar.compact
-                }
-                Repeater {
-                    model: root.pagesIn("accounts-privacy")
-                    NavItem {}
-                }
-                NavHeading {
-                    text: root.groupTitle("system")
-                    compact: sidebar.compact
-                }
-                Repeater {
-                    model: root.pagesIn("system")
+                    model: root.sidebarPages
                     NavItem {}
                 }
             }
@@ -255,15 +197,7 @@ AtlasWindow {
                         return searchPage;
                     if (!root.currentPage)
                         return null;
-                    switch (root.currentPage.kind) {
-                    case "kcm":
-                    case "app":
-                        return launchPage;
-                    case "more":
-                        return morePage;
-                    default:
-                        return pendingPage;
-                    }
+                    return root.currentPage.kind === "more" ? morePage : pendingPage;
                 }
             }
         }
@@ -297,12 +231,9 @@ AtlasWindow {
             backend: root.backend
             query: searchField.query.trim()
             onChosen: (pageId, itemId, kcm) => {
-                if (kcm !== "") {
+                root.openPage(pageId, itemId);
+                if (kcm !== "")
                     root.openKcm(kcm, "");
-                    root.openPage(pageId, itemId, false);
-                } else {
-                    root.openPage(pageId, itemId, true);
-                }
             }
         }
     }
@@ -311,18 +242,6 @@ AtlasWindow {
         PendingPage {
             entry: root.currentPage
             onOpenKcm: name => root.openKcm(name, "")
-        }
-    }
-    Component {
-        id: launchPage
-        LaunchPage {
-            entry: root.currentPage
-            onOpen: {
-                if (entry.kind === "kcm")
-                    root.openKcm(entry.target, "");
-                else
-                    root.run([entry.target]);
-            }
         }
     }
     Component {

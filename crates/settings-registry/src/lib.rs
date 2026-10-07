@@ -10,4 +10,4 @@ pub mod launch;
 pub mod pages;
 pub mod search;
 
-pub use pages::{Group, Item, Kind, PAGES, Page};
+pub use pages::{Item, Kind, PAGES, Page};

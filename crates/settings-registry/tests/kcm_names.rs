@@ -2,8 +2,8 @@
 //! (`fixtures/kcms-plasma-6.7.txt`) and the ones its applets and AtlasOS's
 //! scripts open.
 
+use settings_registry::PAGES;
 use settings_registry::kcm::{self, Target};
-use settings_registry::{Kind, PAGES};
 
 fn installed() -> Vec<&'static str> {
     include_str!("fixtures/kcms-plasma-6.7.txt")
@@ -38,9 +38,6 @@ fn every_mapped_or_linked_kcm_exists() {
         assert!(exists(k), "{k} is mapped but not installed");
     }
     for p in PAGES {
-        if let Kind::Kcm(k) = p.kind {
-            assert!(exists(k), "page {} opens missing {k}", p.id);
-        }
         for i in p.items {
             if let Some(k) = i.kcm {
                 assert!(exists(k), "{}/{} opens missing {k}", p.id, i.id);
@@ -59,7 +56,13 @@ fn callers_land_on_their_page() {
     };
     let cases: &[(&str, Target)] = &[
         ("kcm_networkmanagement", page("network")),
-        ("kcm_bluetooth", page("bluetooth")),
+        (
+            "kcm_bluetooth",
+            Target::Page {
+                page: "devices",
+                item: Some("bluetooth"),
+            },
+        ),
         ("kcm_pulseaudio", page("sound")),
         ("kcm_powerdevilprofilesconfig", page("power")),
         (
@@ -78,15 +81,28 @@ fn callers_land_on_their_page() {
         ),
         ("kcm_landingpage", Target::Home),
         ("kcm_kscreen", page("displays")),
-        ("kcm_clock", page("datetime")),
-        ("kcm_regionandlang", page("region")),
-        ("kcm_keyboard", page("keyboard")),
+        ("kcm_clock", page("time-language")),
+        (
+            "kcm_regionandlang",
+            Target::Page {
+                page: "time-language",
+                item: Some("language"),
+            },
+        ),
+        (
+            "kcm_keyboard",
+            Target::Page {
+                page: "input",
+                item: Some("layouts"),
+            },
+        ),
         ("kcm_notifications", page("notifications")),
-        ("kcm_printer_manager", page("printers")),
+        // A row of Devices; asked for directly, the KCM itself.
+        ("kcm_printer_manager", Target::Kcm),
         (
             "kcm_kwin_virtualdesktops",
             Target::Page {
-                page: "desktop",
+                page: "appearance",
                 item: Some("desktops"),
             },
         ),
@@ -110,8 +126,10 @@ fn more_settings_lists_the_rest() {
         .into_iter()
         .filter(|k| !kcm::has_page(k))
         .collect();
-    assert!(rest.contains(&"kcm_fonts"));
-    assert!(rest.contains(&"kcm_printer_manager"));
+    // Rows that open their KCM aren't listed again.
+    assert!(!rest.contains(&"kcm_fonts"));
+    assert!(!rest.contains(&"kcm_printer_manager"));
+    assert!(rest.contains(&"kcm_kwinrules"));
     assert!(!rest.contains(&"kcm_kscreen"));
     assert!(!rest.contains(&"kcm_landingpage"));
 }

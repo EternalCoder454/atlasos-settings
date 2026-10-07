@@ -29,34 +29,32 @@ pub static MAP: &[(&str, &str, Option<&str>)] = &[
     ("kcm_mobile_wifi", "network", Some("wifi")),
     ("kcm_mobile_wired", "network", Some("wired")),
     ("kcm_mobile_hotspot", "network", Some("hotspot")),
-    ("kcm_bluetooth", "bluetooth", None),
-    ("kcm_firewall", "firewall", None),
+    ("kcm_bluetooth", "devices", Some("bluetooth")),
+    ("kcm_firewall", "privacy", Some("firewall")),
     ("kcm_kscreen", "displays", None),
     ("kcm_nightlight", "displays", Some("night-light")),
     ("kcm_pulseaudio", "sound", None),
-    ("kcm_keyboard", "keyboard", None),
-    ("kcm_mouse", "mouse", None),
-    ("kcm_touchpad", "mouse", None),
+    ("kcm_keyboard", "input", Some("layouts")),
+    ("kcm_mouse", "input", Some("speed")),
+    ("kcm_touchpad", "input", Some("tap")),
     ("kcm_powerdevilprofilesconfig", "power", None),
     ("kcm_mobile_power", "power", None),
     ("kcm_energyinfo", "power", Some("battery")),
     ("kcm_lookandfeel", "appearance", Some("theme")),
     ("kcm_colors", "appearance", Some("accent")),
     ("kcm_wallpaper", "appearance", Some("wallpaper")),
-    ("kcm_kwin_virtualdesktops", "desktop", Some("desktops")),
+    ("kcm_kwin_virtualdesktops", "appearance", Some("desktops")),
     ("kcm_notifications", "notifications", None),
-    ("kcm_componentchooser", "default-apps", Some("defaults")),
-    ("kcm_autostart", "default-apps", Some("autostart")),
-    ("kcm_app-permissions", "app-permissions", None),
+    ("kcm_componentchooser", "apps", Some("defaults")),
+    ("kcm_autostart", "apps", Some("autostart")),
+    ("kcm_app-permissions", "apps", Some("permissions")),
     ("kcm_users", "users", None),
     ("kcm_feedback", "privacy", Some("crash-reports")),
     ("kcm_access", "accessibility", None),
-    ("kcm_clock", "datetime", None),
-    ("kcm_regionandlang", "region", None),
-    ("kcm_updates", "updates", None),
-    ("kcm_about-distro", "about", None),
-    // Printers stays Plasma's KCM, opened from its page.
-    ("kcm_printer_manager", "printers", None),
+    ("kcm_clock", "time-language", None),
+    ("kcm_regionandlang", "time-language", Some("language")),
+    ("kcm_updates", "system", Some("updates")),
+    ("kcm_about-distro", "system", None),
 ];
 
 /// Names that mean "System Settings itself": its landing page, and the
@@ -108,16 +106,14 @@ pub fn resolve(name: &str) -> Target {
     }
 }
 
-/// Whether `name` has a page of Settings: "More Settings" leaves these out.
+/// Whether `name` has a place in Settings: a page it maps to, or a setting
+/// whose row opens it. "Other Plasma Settings" leaves these out.
 pub fn has_page(name: &str) -> bool {
-    match resolve(name) {
-        Target::Home => true,
-        Target::Kcm => false,
-        // Printers is a page, but its KCM is all there is of it.
-        Target::Page { page, .. } => {
-            pages::page(page).is_some_and(|p| !matches!(p.kind, pages::Kind::Kcm(_)))
-        }
-    }
+    !matches!(resolve(name), Target::Kcm)
+        || pages::PAGES
+            .iter()
+            .flat_map(|p| p.items)
+            .any(|i| i.kcm == Some(name))
 }
 
 #[cfg(test)]
@@ -191,13 +187,13 @@ mod tests {
     }
 
     #[test]
-    fn printers_is_its_kcm() {
-        assert_eq!(
-            pages::page("printers").map(|p| p.kind),
-            Some(pages::Kind::Kcm("kcm_printer_manager"))
-        );
-        assert!(!has_page("kcm_printer_manager"));
+    fn kcms_with_a_row_are_not_listed_again() {
+        // Printers and Fonts are rows that open their KCM.
+        assert!(has_page("kcm_printer_manager"));
+        assert!(has_page("kcm_fonts"));
         assert!(has_page("kcm_kscreen"));
-        assert!(!has_page("kcm_fonts"));
+        assert!(!has_page("kcm_kwinrules"));
+        // A direct request for a row's KCM still opens the KCM itself.
+        assert_eq!(resolve("kcm_printer_manager"), Target::Kcm);
     }
 }

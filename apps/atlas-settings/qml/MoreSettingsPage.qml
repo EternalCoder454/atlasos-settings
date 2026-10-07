@@ -74,7 +74,7 @@ AtlasPage {
                 }));
     }
 
-    title: qsTr("More Settings")
+    title: qsTr("Other Plasma Settings")
 
     AtlasLabel {
         Layout.fillWidth: true

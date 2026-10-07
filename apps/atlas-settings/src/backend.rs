@@ -21,11 +21,10 @@ pub mod qobject {
         #[qinvokable]
         fn activate(self: Pin<&mut Backend>, args: &QStringList);
 
-        /// The pages in sidebar order, as JSON: `[{id, title, group,
-        /// groupTitle, symbol, kind, target, kcm, items: [{id, title,
-        /// kcm}]}]`. `kind` is `native`, `kcm`, `app` or `more`; `target`
-        /// the KCM or program a `kcm` or `app` page opens; `kcm` the KCM a
-        /// native page replaces, offered while the page isn't built.
+        /// The pages in sidebar order, as JSON: `[{id, title, symbol, kind,
+        /// kcm, items: [{id, title, kcm, advanced}]}]`. `kind` is `native`
+        /// or `more` (Other Plasma Settings, not in the sidebar); `kcm` the
+        /// KCM a native page replaces, offered while the page isn't built.
         #[qinvokable]
         #[cxx_name = "pagesJson"]
         fn pages_json(self: &Backend) -> QString;
@@ -161,25 +160,27 @@ fn pages_json() -> String {
     let pages: Vec<Value> = PAGES
         .iter()
         .map(|p| {
-            let (kind, target) = match p.kind {
-                Kind::Native => ("native", ""),
-                Kind::Kcm(k) => ("kcm", k),
-                Kind::App(a) => ("app", a),
-                Kind::MoreSettings => ("more", ""),
+            let kind = match p.kind {
+                Kind::Native => "native",
+                Kind::MoreSettings => "more",
             };
             let items: Vec<Value> = p
                 .items
                 .iter()
-                .map(|i| json!({"id": i.id, "title": i.title, "kcm": i.kcm.unwrap_or_default()}))
+                .map(|i| {
+                    json!({
+                        "id": i.id,
+                        "title": i.title,
+                        "kcm": i.kcm.unwrap_or_default(),
+                        "advanced": i.advanced,
+                    })
+                })
                 .collect();
             json!({
                 "id": p.id,
                 "title": p.title,
-                "group": p.group.id(),
-                "groupTitle": p.group.title(),
                 "symbol": p.symbol,
                 "kind": kind,
-                "target": target,
                 "kcm": replaced_kcm(p.id).unwrap_or_default(),
                 "items": items,
             })
@@ -196,7 +197,7 @@ fn search_json(query: &str) -> String {
                 "page": h.page.id,
                 "item": "",
                 "title": h.page.title,
-                "subtitle": h.page.group.title(),
+                "subtitle": "",
                 "symbol": h.page.symbol,
                 "kcm": "",
             }),
@@ -204,7 +205,12 @@ fn search_json(query: &str) -> String {
                 "page": h.page.id,
                 "item": i.id,
                 "title": i.title,
-                "subtitle": h.page.title,
+                // Where it is, as macOS shows it: "Displays › Advanced".
+                "subtitle": if i.advanced {
+                    format!("{} › Advanced", h.page.title)
+                } else {
+                    h.page.title.to_owned()
+                },
                 "symbol": h.page.symbol,
                 "kcm": i.kcm.unwrap_or_default(),
             }),
@@ -245,15 +251,21 @@ mod tests {
         let network = pages.iter().find(|p| p["id"] == "network").unwrap();
         assert_eq!(network["kind"], "native");
         assert_eq!(network["kcm"], "kcm_networkmanagement");
-        let printers = pages.iter().find(|p| p["id"] == "printers").unwrap();
-        assert_eq!(printers["kind"], "kcm");
-        assert_eq!(printers["target"], "kcm_printer_manager");
-        let updates = pages.iter().find(|p| p["id"] == "updates").unwrap();
-        assert_eq!(updates["target"], "atlas-updater");
+        let devices = pages.iter().find(|p| p["id"] == "devices").unwrap();
+        let printers = &devices["items"].as_array().unwrap()[2];
+        assert_eq!(printers["id"], "printers");
+        assert_eq!(printers["kcm"], "kcm_printer_manager");
+        assert_eq!(printers["advanced"], false);
+        let more = pages.iter().find(|p| p["id"] == "more").unwrap();
+        assert_eq!(more["kind"], "more");
         let appearance = pages.iter().find(|p| p["id"] == "appearance").unwrap();
         assert_eq!(appearance["kcm"], "kcm_lookandfeel");
-        // No native page is a dead end while it is pending.
-        for p in pages.iter().filter(|p| p["kind"] == "native") {
+        // No native page is a dead end while it is pending (Home has
+        // nothing of Plasma's to stand in for).
+        for p in pages
+            .iter()
+            .filter(|p| p["kind"] == "native" && p["id"] != "home")
+        {
             assert_ne!(p["kcm"], "", "{} has no KCM to open", p["id"]);
         }
     }
@@ -264,6 +276,7 @@ mod tests {
         let first = &v[0];
         assert_eq!(first["page"], "appearance");
         assert_eq!(first["kcm"], "kcm_fonts");
+        assert_eq!(first["subtitle"], "Appearance › Advanced");
         assert_eq!(
             serde_json::from_str::<Value>(&search_json("")).unwrap(),
             json!([])

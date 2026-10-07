@@ -143,15 +143,17 @@ mod tests {
 
     #[test]
     fn finds_pages_and_settings() {
-        assert_eq!(first("blue"), ("bluetooth", None));
-        assert_eq!(first("wifi"), ("network", None));
-        assert_eq!(first("wi-fi"), ("network", None));
+        assert_eq!(first("blue"), ("devices", None));
+        assert_eq!(first("wifi"), ("network", Some("wifi")));
+        assert_eq!(first("wi-fi"), ("network", Some("wifi")));
         assert_eq!(first("night light"), ("displays", Some("night-light")));
         assert_eq!(first("dark"), ("appearance", Some("style")));
         assert_eq!(first("fingerprint"), ("users", Some("fingerprint")));
-        assert_eq!(first("timezone"), ("datetime", Some("timezone")));
-        assert_eq!(first("SHORTCUTS"), ("keyboard", Some("shortcuts")));
-        assert_eq!(first("printer"), ("printers", None));
+        assert_eq!(first("timezone"), ("time-language", Some("timezone")));
+        assert_eq!(first("SHORTCUTS"), ("input", Some("shortcuts")));
+        assert_eq!(first("printer"), ("devices", Some("printers")));
+        // Folded settings are found too.
+        assert_eq!(first("refresh rate"), ("displays", Some("refresh-rate")));
     }
 
     #[test]

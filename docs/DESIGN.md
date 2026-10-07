@@ -10,9 +10,49 @@ them. The full plan and its reasons are the Atlas Notes note
 Settings replaces KDE System Settings on AtlasOS. Its pages do the work
 themselves through the system's services (NetworkManager, BlueZ, UPower,
 power-profiles-daemon, AccountsService, timedated, localed, hostnamed, the
-portal PermissionStore, KDE's session services). A few pages stay KDE's
+portal PermissionStore, KDE's session services). A few rows stay KDE's
 (Printers opens `kcm_printer_manager`), Updates opens Atlas Updater, and every
-other installed KCM is listed under More Settings and opens in `kcmshell6`.
+other installed KCM is listed under Other Plasma Settings and opens in
+`kcmshell6`.
+
+## Pages: simple first
+
+Plasma's System Settings has around 30 top-level pages and 65 once opened,
+grouped by how the system is built, with its internals' names and every
+option in view: people can't find things. Windows 11 splits settings between
+Settings and Control Panel and drops people into the old one; macOS has a
+"General" junk drawer, an overfull Privacy page and long lists. Settings
+keeps what they do well (Windows' fixed sidebar, values and toggles on the
+rows, related links; macOS's search that shows where a setting lives) and
+holds to these rules, which `crates/settings-registry/tests/pages.rs`
+checks where it can:
+
+- **Few pages, named for what people do**, in one flat sidebar with no
+  headings: Home, Network, Bluetooth & Devices, Displays, Sound, Keyboard &
+  Mouse, Appearance, Notifications, Apps, Privacy & Security, Users, Power &
+  Battery, Accessibility, Time & Language, System. No junk drawer: System is
+  Updates and About only.
+- **The common settings first.** A page shows at most six settings, with
+  good defaults; the rest of what it covers folds into one Advanced section
+  at its end ([`Item::advanced`]). There is no global "advanced mode".
+- **One level deep.** A page never opens a page; details (a network, a
+  device, a user) open in a sheet over it.
+- **Search finds everything**, folded settings and KCM rows too, shows where
+  each lives ("Displays › Advanced"), opens the fold and points at the row.
+- **No dead ends into Plasma for common settings.** A KCM is only a row for
+  something few people change, and says that it opens Plasma's settings;
+  every KCM without a row is under Other Plasma Settings, a link at the end
+  of System that is not in the sidebar.
+- **The state is on the row** (a toggle, the current value), and a page's
+  related pages are links at its end.
+- **A sidebar click always opens the page's top**, never a spot left from an
+  earlier visit.
+- **Home is short and has no promotions:** quick toggles and status (Wi-Fi,
+  Bluetooth, Light or Dark, updates) and recently changed settings.
+- Plain words, a different symbol for every page, and no Apply button.
+
+Page IDs of earlier versions still open where their settings went
+(`pages::RENAMED`).
 
 Until cutover Settings installs beside System Settings, hidden from the menu
 (`NoDisplay=true`), and replaces nothing of KDE's. At cutover a subpackage
@@ -21,10 +61,10 @@ takes over `systemsettings` (see "Entry points").
 ## Layout
 
 - `crates/settings-registry`: no Qt, no dependencies. The page registry
-  (`pages.rs`: groups, pages, the settings on each page and the KCMs they
-  answer for), KCM names and where they land (`kcm.rs`), search over pages
+  (`pages.rs`: pages, the settings on each page, which fold under
+  Advanced, and the KCMs they answer for), KCM names and where they land (`kcm.rs`), search over pages
   and settings (`search.rs`), and launch arguments (`launch.rs`). The
-  sidebar, search, deep links, More Settings and the future `systemsettings`
+  sidebar, search, deep links, Other Plasma Settings and the future `systemsettings`
   shim and KRunner runner all read it, so they can't drift apart.
 - `crates/settings-sys`: no Qt. zbus 5 clients for the system's services,
   one module per service, with timeouts and plain-language errors
@@ -41,21 +81,19 @@ takes over `systemsettings` (see "Entry points").
 One `AtlasWindow`: an `AtlasSidebar` on the left, under a `SearchField`, and
 the page beside it.
 
-- **Sidebar:** a flat list with small group headings (Connections, Devices,
-  Personalization, Apps, Accounts & Privacy, System). The headings are an
-  app-level `NavHeading` (an `AtlasLabel`, Monitor's pattern): AtlasSidebar
-  only treats `SidebarItem` children as entries, so headings take no part in
-  keyboard navigation or filtering, and hide when the sidebar is compact.
+- **Sidebar:** the pages in one flat list, no headings ("Pages: simple
+  first").
 - **Search** lives in the content area, not the sidebar's filter: while the
   field has text, an `AtlasSearchResults` list replaces the page, with Up,
   Down and Enter handled from the field. Results are pages and single
   settings, ranked in Rust (`settings_registry::search`), at most 50.
 - **Pages:** a native page is an `AtlasPage` of `Section`s and
-  `SectionRow`s. Until a page is built it shows "Coming Soon" with a button
-  that opens the KCM it replaces. Every change applies at once; there is no
-  Apply button.
+  `SectionRow`s, its folded settings in a closed Advanced `Section` at the
+  end. Until a page is built it shows "Coming Soon" with a button that opens
+  the KCM it replaces. Every change applies at once; there is no Apply
+  button.
 - The last page shown is kept in `atlas-settingsrc` (`[Window] Page`); a new
-  install starts on Wi-Fi & Network.
+  install starts on Home.
 
 ## Threads
 
