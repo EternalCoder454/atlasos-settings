@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Runs a command with python-dbusmock's NetworkManager and BlueZ on a
 private bus, filled with a few networks and devices, and the address in
-ATLAS_SETTINGS_TEST_BUS, which debug builds of Settings use instead of the
-system bus (apps/atlas-settings/src/support.rs). For smoke runs that show
+TELAMON_SETTINGS_TEST_BUS, which debug builds of Settings use instead of the
+system bus (apps/telamon-settings/src/support.rs). For smoke runs that show
 Network and Bluetooth & Devices working, in the dev container:
 
     scripts/dev.sh scripts/with-mock-services.py scripts/smoke.sh network
@@ -129,7 +129,7 @@ def main():
         fill_network(bus)
         fill_bluetooth(bus)
         bus.close()
-        code = subprocess.call(sys.argv[1:], env=dict(os.environ, ATLAS_SETTINGS_TEST_BUS=address))
+        code = subprocess.call(sys.argv[1:], env=dict(os.environ, TELAMON_SETTINGS_TEST_BUS=address))
     finally:
         for c in reversed(children):
             c.terminate()

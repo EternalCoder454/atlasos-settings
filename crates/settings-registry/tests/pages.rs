@@ -65,6 +65,7 @@ fn the_sidebar_is_short() {
             "accessibility",
             "time-language",
             "system",
+            "updates",
         ]
     );
     assert!(pages::page("more").is_some());
@@ -111,8 +112,8 @@ fn renamed_pages_land_on_real_pages() {
 }
 
 #[test]
-fn symbols_exist_in_atlas_ui_1_4() {
-    let names: HashSet<&str> = include_str!("fixtures/symbols-atlas-ui-1.4.0.txt")
+fn symbols_exist_in_telamon_ui_2_0() {
+    let names: HashSet<&str> = include_str!("fixtures/symbols-telamon-ui-2.0.0.txt")
         .lines()
         .filter(|l| !l.starts_with('#'))
         .collect();
@@ -138,4 +139,27 @@ fn related_pages_are_real() {
             assert!(seen.insert(*r), "{}: {r} twice", p.id);
         }
     }
+}
+
+/// Updates is a page of its own, not a row of System that opens another app.
+#[test]
+fn updates_is_a_page_of_its_own() {
+    let (page, item) = pages::find("updates", Some("check")).expect("the Updates page");
+    assert_eq!(page.id, "updates");
+    assert_eq!(item.map(|i| i.id), Some("check"));
+    // Neither a renamed ID nor a row of System any more.
+    assert!(RENAMED.iter().all(|(old, _, _)| *old != "updates"));
+    assert!(pages::page("system").is_some_and(|p| p.item("updates").is_none()));
+    // The tray opens it with `telamon-settings updates check`.
+    let (requests, refused) = settings_registry::launch::parse(&["updates".into(), "check".into()]);
+    assert!(refused.is_empty(), "{refused:?}");
+    assert_eq!(
+        requests,
+        [settings_registry::launch::Request::Page {
+            page: "updates",
+            item: Some("check"),
+        }]
+    );
+    // System's links lead to it.
+    assert!(pages::page("system").is_some_and(|p| p.related.contains(&"updates")));
 }

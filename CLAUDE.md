@@ -1,6 +1,6 @@
-# Settings (AtlasOS)
+# Settings (Telamon OS)
 
-Rust + Qt 6.11 + Kirigami (CXX-Qt) settings app for AtlasOS, a Fedora Kinoite
+Rust + Qt 6.11 + Kirigami (CXX-Qt) settings app for Telamon OS, a Fedora Kinoite
 44 bootc image (repo `~/Documents/Projects/AtlasOS/AtlasOS`). It replaces KDE
 System Settings: its own pages over the system's services, the KCMs it has no
 page for under Other Plasma Settings, and System Settings' entry points
@@ -20,7 +20,7 @@ logging, crash reports), which Settings takes from there.
 
 - **Build and test inside the `fedora:44` dev container**, never on the host:
   `scripts/dev.sh <command>`. The repo is at `/src`; all build output goes to
-  `/work` (`~/.cache/claude-builds/atlas-settings` on the host), never into
+  `/work` (`~/.cache/claude-builds/telamon-settings` on the host), never into
   the repo or `/tmp`. Use a separate target dir per agent or task
   (`CARGO_TARGET_DIR=/work/target/<name> scripts/dev.sh ...`).
 - **Intensive jobs go through the machine-wide queue**:
@@ -31,7 +31,7 @@ logging, crash reports), which Settings takes from there.
   services on a private bus (`crates/settings-sys/tests/common`), never the
   host's system or session bus. Smoke runs (`scripts/smoke.sh`) use a session
   bus that can't start services, Xvfb, and `XDG_*_HOME` under `/work/smoke`.
-  Real end-to-end tests happen in the AtlasOS test VM, which the AtlasOS
+  Real end-to-end tests happen in the Telamon OS test VM, which the Telamon OS
   session runs.
 - **Use the system's services; never reimplement them.** Every privileged
   change goes through the service that owns it (NetworkManager,
@@ -45,15 +45,15 @@ logging, crash reports), which Settings takes from there.
 - **The GUI thread never blocks on D-Bus.** System calls run on worker
   threads with timeouts (`settings_sys::bus`); results come back with
   `qt_thread().queue`.
-- **Atlas.Ui is the installed `atlas-ui` package** from atlas-framework
-  (`~/Documents/Atlas Framework`, read-only from here). Never copy Atlas.Ui
+- **Telamon.Ui is the installed `telamon-ui` package** from atlas-framework
+  (`~/Documents/Atlas Framework`, read-only from here). Never copy Telamon.Ui
   controls into this repo: ask the "AtlasOS Framework" session. Use only API
-  that exists at the pinned release (`fw-src/api/atlas-ui.api` at the tag,
+  that exists at the pinned release (`fw-src/api/telamon-ui.api` at the tag,
   not "Since 1.5.0" members).
 - **The page registry is the one list.** Sidebar, search, deep links, the
   KCM map and Other Plasma Settings read `crates/settings-registry`; never list pages
   or KCM names anywhere else.
-- **Don't edit the AtlasOS image.** Hand the AtlasOS session an RPM or a
+- **Don't edit the Telamon OS image.** Hand the Telamon OS session an RPM or a
   commit to pin (`atlas-apps.lock`). Until cutover the desktop file stays
   `NoDisplay=true` and nothing of KDE's is replaced.
 - Tests assert invariants and use fixtures (`crates/*/tests/fixtures`),
@@ -62,7 +62,7 @@ logging, crash reports), which Settings takes from there.
   `EternalHell <77252745+EternalCoder454@users.noreply.github.com>`. Commit
   only the paths you own (`git commit -- <paths>`). Don't push unless the
   lead asked.
-- Licence: MIT. App ID `net.eterneon.atlas.settings`. Wording follows KDE:
+- Licence: MIT. App ID `net.eterneon.telamon.settings`. Wording follows KDE:
   Title Case buttons and titles, US spelling.
 
 ## Commands
@@ -72,32 +72,49 @@ logging, crash reports), which Settings takes from there.
 | Format | `scripts/dev.sh cargo fmt --all --check` |
 | Lint | `scripts/dev.sh cargo clippy --workspace --all-targets --locked -- -D warnings` |
 | Tests | `scripts/dev.sh cargo test --workspace --locked` |
-| App build | `scripts/dev.sh bash -c 'cmake -S apps/atlas-settings -B /work/cmake/dev -G Ninja && cmake --build /work/cmake/dev'` |
-| Smoke run | `SMOKE_OUT=/work/smoke/<name> scripts/dev.sh scripts/smoke.sh [app args]` (screenshot and log in `~/.cache/claude-builds/atlas-settings/smoke/<name>`) |
-| RPM | `podman run --rm --security-opt label=disable -v "$PWD":/src -v <framework rpms>:/atlas-rpms:ro -e ATLAS_LOCAL_RPMS=/atlas-rpms -v atlas-cargo:/root/.cargo/registry -v atlas-cargo-git:/root/.cargo/git -e CARGO_HOME=/root/.cargo registry.fedoraproject.org/fedora:44 /src/packaging/build-rpm.sh /src/out` |
-| Atlas checks | `git -C ~/Documents/Atlas\ Framework archive v1.4.0 tools ui \| tar -x -C <dir>`, then `<dir>/tools/lint-app.sh apps/atlas-settings` and `<dir>/tools/check-app-names.sh apps/atlas-settings` |
+| App build | `scripts/dev.sh bash -c 'cmake -S apps/telamon-settings -B /work/cmake/dev -G Ninja && cmake --build /work/cmake/dev'` |
+| Smoke run | `SMOKE_OUT=/work/smoke/<name> scripts/dev.sh scripts/smoke.sh [app args]` (screenshot and log in `~/.cache/claude-builds/telamon-settings/smoke/<name>`) |
+| RPM | `podman run --rm --security-opt label=disable -v "$PWD":/src -v <framework rpms>:/telamon-rpms:ro -e TELAMON_LOCAL_RPMS=/telamon-rpms -v telamon-cargo:/root/.cargo/registry -v telamon-cargo-git:/root/.cargo/git -e CARGO_HOME=/root/.cargo registry.fedoraproject.org/fedora:44 /src/packaging/build-rpm.sh /src/out` |
+| Telamon app checks | `git -C ~/Documents/Atlas\ Framework archive v2.0.0 tools ui \| tar -x -C <dir>`, then `<dir>/tools/lint-app.sh apps/telamon-settings` and `<dir>/tools/check-app-names.sh apps/telamon-settings` |
 
 `<framework rpms>` is the out dir of atlas-framework's `packaging/build-rpm.sh`
-(here `~/.cache/claude-builds/atlas-settings/fw-rpms-1.4.0`): no repository
-has atlas-ui. `scripts/dev.sh` builds `localhost/atlas-settings-dev:44` on
-first use, which needs `ATLAS_LOCAL_RPMS=<dir>` holding them.
+(here `~/.cache/claude-builds/telamon-settings/fw-rpms-2.0.0`): no repository
+has telamon-ui. `scripts/dev.sh` builds `localhost/telamon-settings-dev:44` on
+first use, which needs `TELAMON_LOCAL_RPMS=<dir>` holding them.
 
-Without `ATLAS_REQUIRE_DBUSMOCK=1` the `settings-sys` service tests skip when
+Without `TELAMON_REQUIRE_DBUSMOCK=1` the `settings-sys` service tests skip when
 `dbus-daemon` or python-dbusmock is missing; CI and `scripts/dev.sh` set it, so a
 skip there is a failure.
 
 ## Moving the atlas-framework pin
 
 1. Change `tag` in `Cargo.toml`, then
-   `scripts/dev.sh cargo update -p atlas-framework-ui`.
-2. Move the Atlas app checks job in `.github/workflows/ci.yml`:
+   `scripts/dev.sh cargo update -p telamon-framework-ui`.
+2. Move the Telamon app checks job in `.github/workflows/ci.yml`:
    `app-checks.yml@<the tag's commit> # vX.Y.Z` and `framework-ref: vX.Y.Z`
    (`git ls-remote https://github.com/EternalCoder454/atlas-framework 'refs/tags/vX.Y.Z^{}'`).
    The framework job reads the tag from `Cargo.toml` and fails when the two
    disagree.
-   When the app uses something new in Atlas.Ui, also `ui:` in `src/lib.rs`
-   and `atlas-ui >=` in the spec (Requires and BuildRequires).
-3. Refresh `crates/settings-registry/tests/fixtures/symbols-atlas-ui-*.txt`
+   When the app uses something new in Telamon.Ui, also `ui:` in `src/lib.rs`
+   and `telamon-ui >=` in the spec (Requires and BuildRequires).
+3. Refresh `crates/settings-registry/tests/fixtures/symbols-telamon-ui-*.txt`
    from that release's `symbols.txt`.
 4. Rebuild the dev image against that release's RPMs.
 5. Commit `Cargo.toml` and `Cargo.lock` together.
+
+## Moving the telamon-updater-core pin
+
+The Updates page's logic is `telamon-updater-core`, in the atlasos-updater
+repository (Telamon Updater's own Rust code: the system helper's client, the
+settings file, schedule, restart and locks, Flatpak updates, firmware, release
+notes). Cargo.toml pins it to a revision of that repository.
+
+1. Change `rev` of `telamon-updater-core` in `Cargo.toml` (a commit of
+   atlasos-updater that is on GitHub), then
+   `scripts/dev.sh cargo update -p telamon-updater-core`.
+2. Working on both at once: `TELAMON_UPDATER_SRC=<atlasos-updater checkout>
+   scripts/dev.sh ...` mounts it at `/updater-src`; point the dependency at
+   `path = "/updater-src/crates/telamon-updater-core"` while you do, and put
+   the git `rev` back before committing (Cargo.lock too).
+3. The tray's names (`SetWorking`, `Reload`) and the helper's D-Bus API are
+   Telamon Updater's: change them there first.

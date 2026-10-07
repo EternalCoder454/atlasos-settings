@@ -18,7 +18,7 @@ pub enum Kind {
 }
 
 /// One setting on a page: what search finds and what a deep link
-/// (`atlas-settings <page> <item>`) scrolls to.
+/// (`telamon-settings <page> <item>`) scrolls to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Item {
     pub id: &'static str,
@@ -36,7 +36,7 @@ pub struct Item {
 pub struct Page {
     pub id: &'static str,
     pub title: &'static str,
-    /// An Atlas.Ui `Symbols` name (`Symbols.codepoint(name)` in QML).
+    /// A Telamon.Ui `Symbols` name (`Symbols.codepoint(name)` in QML).
     pub symbol: &'static str,
     pub kind: Kind,
     /// Other words people search with (lower case).
@@ -70,7 +70,6 @@ pub static RENAMED: &[(&str, &str, Option<&str>)] = &[
     ("firewall", "privacy", Some("firewall")),
     ("datetime", "time-language", None),
     ("region", "time-language", Some("language")),
-    ("updates", "system", Some("updates")),
     ("about", "system", None),
 ];
 
@@ -345,7 +344,11 @@ pub static PAGES: &[Page] = &[
             adv("top-bar", "Top Bar", &["menu bar", "clock", "panel"]),
             adv("hot-corners", "Hot Corners", &["screen edges", "corner"]),
             adv("desktops", "Virtual Desktops", &["workspaces", "pager"]),
-            adv("theme", "Global Theme", &["look and feel", "atlasos theme"]),
+            adv(
+                "theme",
+                "Global Theme",
+                &["look and feel", "atlasos theme", "telamon theme"],
+            ),
             adv_kcm(
                 "fonts",
                 "Fonts",
@@ -461,6 +464,16 @@ pub static PAGES: &[Page] = &[
                 "crash-reports",
                 "Crash Reports",
                 &["crash", "bug reports", "telemetry"],
+            ),
+            item(
+                "crash-review",
+                "Review Crash Reports",
+                &[
+                    "send crash report",
+                    "sent reports",
+                    "bug report",
+                    "stack trace",
+                ],
             ),
             adv(
                 "firewall-rules",
@@ -611,11 +624,10 @@ pub static PAGES: &[Page] = &[
         items: &[
             item("device-name", "Device Name", &["hostname", "computer name"]),
             item(
-                "updates",
-                "Updates",
-                &["upgrade", "software update", "atlas updater", "bootc"],
+                "version",
+                "Telamon OS Version",
+                &["atlasos", "image", "bootc", "release"],
             ),
-            item("version", "AtlasOS Version", &["image", "bootc", "release"]),
             item(
                 "hardware",
                 "Hardware",
@@ -635,7 +647,77 @@ pub static PAGES: &[Page] = &[
                 &["kde", "kcm", "system settings", "more settings"],
             ),
         ],
-        related: &["time-language", "users", "privacy"],
+        related: &["updates", "time-language", "users", "privacy"],
+    },
+    Page {
+        id: "updates",
+        title: "Updates",
+        symbol: "SystemUpdateAlt",
+        kind: Kind::Native,
+        keywords: &[
+            "upgrade",
+            "software update",
+            "windows update",
+            "atlas updater",
+            "telamon updater",
+            "bootc",
+            "restart to update",
+        ],
+        items: &[
+            item(
+                "check",
+                "Check for Updates",
+                &[
+                    "refresh",
+                    "download update",
+                    "install update",
+                    "restart to update",
+                    "new version",
+                ],
+            ),
+            item(
+                "notes",
+                "What's New",
+                &["release notes", "what changed", "new features"],
+            ),
+            item(
+                "apps",
+                "App Updates",
+                &["flatpak", "update apps", "app store", "software"],
+            ),
+            item(
+                "firmware",
+                "Firmware Updates",
+                &["fwupd", "bios", "uefi", "device firmware", "lvfs"],
+            ),
+            adv(
+                "go-back",
+                "Go Back to the Previous Version",
+                &[
+                    "rollback",
+                    "undo update",
+                    "revert",
+                    "downgrade",
+                    "previous version",
+                ],
+            ),
+            adv(
+                "channel",
+                "Update Channel",
+                &["stable", "testing", "beta", "early access"],
+            ),
+            adv(
+                "automatic-apps",
+                "Update Apps in the Background",
+                &["automatic", "background updates", "auto update", "flatpak"],
+            ),
+            adv(
+                "history",
+                "Update History",
+                &["changelog", "versions", "what changed", "installed updates"],
+            ),
+        ],
+        related: &["privacy", "system"],
     },
     // Not in the sidebar: System's "Other Plasma Settings" opens it, and
     // search and links can.

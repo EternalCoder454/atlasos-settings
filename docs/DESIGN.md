@@ -7,12 +7,12 @@ them. The full plan and its reasons are the Atlas Notes note
 
 ## Scope
 
-Settings replaces KDE System Settings on AtlasOS. Its pages do the work
+Settings replaces KDE System Settings on Telamon OS. Its pages do the work
 themselves through the system's services (NetworkManager, BlueZ, UPower,
 power-profiles-daemon, AccountsService, timedated, localed, hostnamed, the
-portal PermissionStore, KDE's session services). A few rows stay KDE's
-(Printers opens `kcm_printer_manager`), Updates opens Atlas Updater, and every
-other installed KCM is listed under Other Plasma Settings and opens in
+portal PermissionStore, KDE's session services, the system helper for
+updates). A few rows stay KDE's (Printers opens `kcm_printer_manager`), and
+every other installed KCM is listed under Other Plasma Settings and opens in
 `kcmshell6`.
 
 ## Pages: simple first
@@ -30,8 +30,9 @@ checks where it can:
 - **Few pages, named for what people do**, in one flat sidebar with no
   headings: Home, Network, Bluetooth & Devices, Displays, Sound, Keyboard &
   Mouse, Appearance, Notifications, Apps, Privacy & Security, Users, Power &
-  Battery, Accessibility, Time & Language, System. No junk drawer: System is
-  Updates and About only.
+  Battery, Accessibility, Time & Language, System, Updates. No junk drawer:
+  System is About only, and Updates is its own page, as in Windows, last in
+  the list.
 - **The common settings first.** A page shows at most six settings, with
   good defaults; the rest of what it covers folds into one Advanced section
   at its end ([`Item::advanced`]). There is no global "advanced mode".
@@ -48,7 +49,7 @@ checks where it can:
 - **A sidebar click always opens the page's top**, never a spot left from an
   earlier visit.
 - **Home is short and has no promotions:** quick toggles and status (Wi-Fi,
-  Bluetooth, Light or Dark, updates) and recently changed settings.
+  Bluetooth, Light or Dark) and recently changed settings.
 - Plain words, a different symbol for every page, and no Apply button.
 
 Page IDs of earlier versions still open where their settings went
@@ -69,11 +70,13 @@ takes over `systemsettings` (see "Entry points").
 - `crates/settings-sys`: no Qt. zbus 5 clients for the system's services,
   one module per service, with timeouts and plain-language errors
   (`error.rs`). Tested against python-dbusmock on a private bus.
-- `apps/atlas-settings`: the CXX-Qt backend (`src/backend.rs`), one
+- `apps/telamon-settings`: the CXX-Qt backend (`src/backend.rs`), one
   backend QObject per built page (`src/time_language.rs`,
   `src/system_info.rs`) and the worker-thread helper (`src/worker.rs`),
+  the Updates page's backend (`src/updates_page.rs`, over
+  telamon-updater-core, see "Updates"),
   `cpp/main.cpp` (Qt start, single instance, command line),
-  `cpp/launcher.cpp` (starts `kcmshell6` and Atlas Updater),
+  `cpp/launcher.cpp` (starts `kcmshell6`),
   `cpp/kcmcatalog.cpp` (the installed KCMs, through KPluginMetaData),
   `cpp/pagebackends.cpp` (makes a page's backends when it is shown),
   `cpp/localeconfig.cpp` (Plasma's `plasma-localerc`, through KConfig), the
@@ -85,7 +88,7 @@ takes over `systemsettings` (see "Entry points").
   `cpp/powerconfig.cpp`, `cpp/screenlockconfig.cpp`,
   `cpp/autostartconfig.cpp` and `cpp/defaultapps.cpp` (more KConfig and
   KService) and `qml/`.
-- The page kit in `qml/`: `SettingsPage` (an `AtlasPage` with the page's
+- The page kit in `qml/`: `SettingsPage` (an `TelamonPage` with the page's
   registry entry; scrolls to and briefly highlights the row a link or
   search asked for, found by its `objectName` = the item ID, and opens
   Advanced first when the item is folded), `AdvancedSection` (the closed
@@ -99,13 +102,13 @@ takes over `systemsettings` (see "Entry points").
 
 ## Window
 
-One `AtlasWindow`: an `AtlasSidebar` on the left, under a `SearchField`, and
+One `TelamonWindow`: an `TelamonSidebar` on the left, under a `SearchField`, and
 the page beside it.
 
 - **Sidebar:** the pages in one flat list, no headings ("Pages: simple
   first").
 - **Search** lives in the content area, not the sidebar's filter: while the
-  field has text, an `AtlasSearchResults` list replaces the page, with Up,
+  field has text, an `TelamonSearchResults` list replaces the page, with Up,
   Down and Enter handled from the field. Results are pages and single
   settings, ranked in Rust (`settings_registry::search`), at most 50.
 - **Pages:** a native page is a `SettingsPage` of `Section`s and
@@ -114,7 +117,7 @@ the page beside it.
   makes the page anew, so it opens at its top with Advanced closed. Until a page is built it shows "Coming Soon" with a button that opens
   the KCM it replaces. Every change applies at once; there is no Apply
   button.
-- The last page shown is kept in `atlas-settingsrc` (`[Window] Page`); a new
+- The last page shown is kept in `telamon-settingsrc` (`[Window] Page`); a new
   install starts on Home.
 
 ## Threads
@@ -197,7 +200,7 @@ the page, and a result that comes back after the page is gone is dropped.
   Launcher (argv, `/usr/bin` only); Plasma writes the file and repaints. The
   Appearance page does the same with the same two names.
 - **Smoke runs with services:** a debug build started with
-  `ATLAS_SETTINGS_TEST_BUS=<address>` uses that bus instead of the system bus
+  `TELAMON_SETTINGS_TEST_BUS=<address>` uses that bus instead of the system bus
   (`src/support.rs`; release builds ignore it).
   `scripts/with-mock-services.py <command>` starts a private bus with
   python-dbusmock's NetworkManager and BlueZ, filled with a few networks and
@@ -208,7 +211,7 @@ the page, and a result that comes back after the page is gone is dropped.
 
 Both are QML pages over a small C++ QObject made by `PageBackends` when the
 page is shown and gone with it; the logic that needs no screen or sound
-server is in plain Qt files that Qt Test covers (`apps/atlas-settings/tests`,
+server is in plain Qt files that Qt Test covers (`apps/telamon-settings/tests`,
 run with `ctest`).
 
 - **Displays** reads and sets the screens through libkscreen
@@ -239,14 +242,14 @@ run with `ctest`).
   virtual, and the system's own event sounds. App names and icons come from
   the stream's properties, made safe to show (a theme icon name, never a
   path).
-- **Testing without screens or sound.** `ATLAS_SETTINGS_FAKE_DISPLAYS=<json>`
-  (built with `ATLAS_SETTINGS_TEST_HOOKS`, on by default) gives Displays
+- **Testing without screens or sound.** `TELAMON_SETTINGS_FAKE_DISPLAYS=<json>`
+  (built with `TELAMON_SETTINGS_TEST_HOOKS`, on by default) gives Displays
   libkscreen's Fake backend with the layout in that file
   (`tests/fixtures/displays-two.json`: a 3840x2160 screen at 1.7x with an
   upright 1920x1080 one); it is the only place Settings uses a private
   libkscreen header. The Sound test (`soundmixer_test`) needs a private
   PipeWire with null devices and skips without one
-  (`ATLAS_TEST_SOUND=private`). Neither touches the real screens or audio.
+  (`TELAMON_TEST_SOUND=private`). Neither touches the real screens or audio.
 
 ## Appearance, Keyboard & Mouse, Notifications and Accessibility
 
@@ -267,14 +270,14 @@ Plasma shell calls against fakes (`tests/fakes.h`) on a private session bus.
   ColorScheme` into the user's kdeglobals and announces it: the keys
   kvantum-sync watches, and gtkconfig, which follows for GTK. The icons
   (`Papirus`/`Papirus-Dark`) and the Aurorae window decoration follow when
-  they are AtlasOS's own; a theme the user picked stays. The scheme shown is
+  they are Telamon OS's own; a theme the user picked stays. The scheme shown is
   read as kvantum-sync reads it (kdeglobals, `kdedefaults/kdeglobals`, then
   /etc/xdg).
 - **Accent** is `plasma-apply-colorscheme --accent-color` (kdeglobals
   `AccentColor`), or `accentColorFromWallpaper=true`, which Plasma's accent
   service follows. Violet, the default, is the scheme's own accent.
 - **High Contrast** (Accessibility) makes `AtlasOSHighContrast{Light,Dark}`
-  from the AtlasOS scheme in `~/.local/share/color-schemes` and applies it;
+  from the Telamon OS scheme in `~/.local/share/color-schemes` and applies it;
   Light or Dark then switches between the two high contrast schemes.
   Plasma has no switch of its own. Kvantum's themes are fixed colours, so
   Qt widgets of apps that use Kvantum keep their look; palette-based apps
@@ -283,12 +286,12 @@ Plasma shell calls against fakes (`tests/fakes.h`) on a private session bus.
   for what the page lists (`/usr/share/wallpapers`, `~/.local/share/
   wallpapers` and `~/Pictures`). The current one is read from the applets
   file, read only.
-- **Transparency** is Atlas.Ui's `Appearance.transparency` (`atlasrc`
+- **Transparency** is Telamon.Ui's `Appearance.transparency` (`atlasrc`
   `[Appearance] Transparency`), the key kvantum-sync and every Atlas app
   watch.
 - **Dock and top bar** are Plasma panels, read and changed with Plasma's panel
-  scripting (`org.kde.PlasmaShell.evaluateScript`), as the AtlasOS menu bar
-  toggle does: the dock is the panel with the task manager and the AtlasOS
+  scripting (`org.kde.PlasmaShell.evaluateScript`), as the Telamon OS menu bar
+  toggle does: the dock is the panel with the task manager and the Telamon OS
   dock separator. Scripts are fixed text with validated values only.
 - **Virtual Desktops** are KWin's `org.kde.KWin.VirtualDesktopManager`
   (`createDesktop`, `removeDesktop`); **Hot Corners** are kwinrc
@@ -327,7 +330,7 @@ Each page's system calls are `settings-sys` clients tested against
 python-dbusmock (templates for the services it has none for are in
 `crates/settings-sys/tests/templates`); each page's files are KConfig or
 KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
-(`apps/atlas-settings/tests/configtests.cpp`, `-DATLAS_SETTINGS_TESTS=ON`).
+(`apps/telamon-settings/tests/configtests.cpp`, `-DTELAMON_SETTINGS_TESTS=ON`).
 
 - **Power & Battery.** The power mode is power-profiles-daemon's
   `ActiveProfile` (`net.hadess.PowerProfiles`, or UPower's name for it from
@@ -360,9 +363,17 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   `firewalld.service` through systemd; firewalld is only asked while
   systemd says it runs, because a call would start it again. Allowed Apps
   and Ports are the runtime zone API for the zone in use, made permanent
-  with `runtimeToPermanent`. Crash Reports are atlas-framework-system's
-  per-user setting (`~/.config/atlas/crash-reporting.toml`), saved with the
-  same call Updater uses, then Updater's tray is told to `Reload`.
+  with `runtimeToPermanent`. Crash Reports are telamon-framework-system's
+  per-user setting (`~/.config/telamon/crash-reporting.toml`; the old
+  `~/.config/atlas/` file is read until the new one exists), saved with the
+  same call Updater uses, then Telamon Updater's tray is told to `Reload`
+  (it collects the reports and says when one waits). "Review Crash Reports"
+  (a sheet, `src/crash_reports.rs`, the Crash Reports screens of Updater's old
+  window) lists the reports waiting with exactly the data that would be
+  sent, and sends one only when the person presses Send for it (the
+  framework's `crash::send`); Don't Send deletes it; the reports sent in the
+  last 90 days are listed below. Links come from the sheet's data only when
+  `https://`.
 - **Apps.** Default Apps are `~/.config/mimeapps.list` (`[Default
   Applications]`, `[Added Associations]`) for the file types a kind covers,
   chosen only among the apps KService offers for it; the terminal is
@@ -375,6 +386,63 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   groups and keys are kept) and the portals' PermissionStore for
   background, camera, microphone and screen access.
 
+## Updates
+
+Updates is the page Telamon Updater's window was (Windows Update living in
+Settings, not beside it). The window is gone from the Updater repo; what is
+left there runs in the background: the tray (panel icon, schedule,
+notifications, background app rounds), the system helper and the screen
+glow. Settings uses the same code, not a copy of it: `telamon-updater-core`
+(the repository `atlasos-updater`, a git dependency pinned to a commit in
+`Cargo.toml`) holds the Qt-free logic (the system helper's client and
+progress parser from `telamon-update-engine`, the settings file, schedule,
+restart and locks from `telamon-updater-base`, Flatpak updates, firmware,
+release notes, history), and `src/updates_page.rs` is the QObject around it,
+the old window's backend without its crash report screens.
+
+- **The page**: the status on top (Telamon OS is up to date, an update is
+  available, downloading and installing with a bar, restart to finish) with
+  the one next step (Check for Updates, Download Update, Restart to Update,
+  Restart Tonight or at a time, Try Again); What's New (the release notes,
+  in a sheet); App Updates (Flatpak, with "Update Apps"); Firmware Updates
+  (only with fwupd); under Advanced Go Back to the Previous Version, Update
+  Channel (stable or testing), Update Apps in the Background, and Update
+  History (the versions this computer ran with their release notes, and the
+  app updates), each in a sheet. A link to Privacy & Security is where
+  crash reports are.
+- **The system helper** is the Updater package's (`telamon-system-helper`,
+  D-Bus name `net.eterneon.telamon.SystemHelper`, six methods and a
+  `Progress` property, polkit actions of its own). Settings adds no method,
+  helper or polkit action; every call asks polkit through the helper, which
+  keeps "no root helper of our own" true for Settings.
+- **The backend lives as long as the window**, not as long as the page
+  (`Main.qml` makes it on the first visit): an update, app update or firmware
+  install that runs while another page is shown goes on and shows again when
+  the page does. Closing the window while the system is being changed
+  (`working`) only hides it; the program goes when that ends
+  (`cpp/main.cpp`, `keepRunning`). The first read of the page asks the
+  helper (D-Bus activated), so a visit to another page never starts it.
+- **The glow** ("the system is being changed") belongs to Telamon Updater's
+  tray, which starts `telamon-updater-glow`, the one program that draws it
+  around the edges of every screen. Settings tells the tray when `working`
+  starts and ends (`settings_sys::updater::set_working`, the tray's
+  `SetWorking` on the session bus; the tray forgets it when Settings leaves
+  the bus, so a crash leaves no glow). An update, switch or go back that
+  outlives Settings is seen by the tray itself, from the helper's `Progress`
+  property.
+- **Links**: `telamon-settings updates` opens the page and `updates check`
+  opens it and starts a check (the tray's Check for Updates, the
+  notifications' actions); `kcm_updates` is the page; the System page's
+  related links lead to it.
+- **Fixtures**: `TELAMON_UPDATER_FIXTURES=<dir>` (a debug or `fixtures`
+  build; the states are in the Updater repo, `crates/telamon-updater-core/fixtures-states`
+  and are copied to `apps/telamon-settings/fixtures-states` for the smoke
+  runs) shows the page with a banner "Developer test data" and
+  never touches the helper, Flatpak, fwupd or the user's settings file.
+  `scripts/smoke-mock.sh updates` instead starts a mock helper
+  (python-dbusmock, `crates/settings-sys/tests/templates/system_helper.py`)
+  on the private bus.
+
 ## Launch arguments and single instance
 
 `main.cpp` uses `KDBusService::Unique`. A second launch hands its arguments
@@ -382,7 +450,7 @@ to the first, which raises its window and passes them to `Backend.activate`.
 Arguments are parsed in Rust (`settings_registry::launch`), never in C++ or
 QML:
 
-- `atlas-settings <page> [setting]`, `--page <page>`
+- `telamon-settings <page> [setting]`, `--page <page>`
 - `--kcm <name> [--args <text>]`, `--kcm=<name>`
 - `--search <text>`
 
@@ -409,23 +477,23 @@ links can ask for them.
 
 Today `systemsettings <kcm>` (KCMLauncher, the tray applets, the `kcm_*`
 launchers, the image's scripts) opens KDE's System Settings. At cutover a
-subpackage `atlas-settings-systemsettings` `Obsoletes:` and `Provides:`
+subpackage `telamon-settings-systemsettings` `Obsoletes:` and `Provides:`
 plasma-systemsettings and installs:
 
 1. `/usr/bin/systemsettings`, a small Rust binary that validates its argv
-   with the same registry code and execs `atlas-settings --kcm <name>` for a
+   with the same registry code and execs `telamon-settings --kcm <name>` for a
    KCM Settings has a page for, else `kcmshell6 <name>`. No shell, no PATH
    lookup beyond the two fixed binaries.
 2. Hidden `systemsettings.desktop` and `kdesystemsettings.desktop` that
    launch Settings, so KCMLauncher keeps finding System Settings and old pins
    keep working.
 
-The AtlasOS Launcher, which replaces KRunner, finds Settings pages through
-`/usr/share/atlas-settings/search-index.json`, generated from the registry,
+The Telamon OS Launcher, which replaces KRunner, finds Settings pages through
+`/usr/share/telamon-settings/search-index.json`, generated from the registry,
 and opens them with `org.freedesktop.Application.ActivateAction` (`open`,
 `open-app`). This is planned for F1; the format is in the Plan note.
 
-The image's own changes (menu entry, dock pin, scripts) are the AtlasOS
+The image's own changes (menu entry, dock pin, scripts) are the Telamon OS
 session's. Direct `kcmshell6` calls (Dolphin's trash, KNotifications) keep
 opening that one KDE page.
 
@@ -451,7 +519,7 @@ applets and the image use against a fixture of Plasma 6.7's KCMs.
 - **Secrets:** passwords and PINs are never logged and are held only for the
   call. Wi-Fi passwords go to NetworkManager and are never stored by us.
 - **Files:** only the user's own, written atomically (KConfig or
-  AtlasSettings).
+  TelamonSettings).
 
 ## Strings and translation
 

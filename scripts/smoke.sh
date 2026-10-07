@@ -4,12 +4,12 @@
 # under /work/smoke, opens it with the given arguments, waits, screenshots
 # the window and checks the log for QML errors.
 #   scripts/smoke.sh [app arguments...]
-# Env: ATLAS_SETTINGS_BIN (default /work/cmake/dev/atlas-settings),
+# Env: TELAMON_SETTINGS_BIN (default /work/cmake/dev/telamon-settings),
 #      SMOKE_OUT (default /work/smoke/out), SMOKE_WAIT seconds (default 3),
 #      SMOKE_SCALE (QT_SCALE_FACTOR, default 1).
 set -euo pipefail
 
-bin=${ATLAS_SETTINGS_BIN:-/work/cmake/dev/atlas-settings}
+bin=${TELAMON_SETTINGS_BIN:-/work/cmake/dev/telamon-settings}
 out=${SMOKE_OUT:-/work/smoke/out}
 root=/work/smoke/xdg
 mkdir -p "$out" "$root"/{config,data,cache,runtime}
@@ -65,10 +65,12 @@ if [ -n "${SMOKE_XDO:-}" ]; then
     xdotool $SMOKE_XDO
     sleep 1
 fi
-w=$(xdotool search --onlyvisible --name '^Settings' | head -1 || true)
+w=$(xdotool search --onlyvisible --name '^Telamon Settings' | head -1 || true)
 if [ -n "$w" ]; then
     import -window "$w" "$out/window.png"
     echo "screenshot: $out/window.png"
+    # The window's title is the app's name (no window manager here to draw it).
+    echo "window title: $(xdotool getwindowname "$w")"
 else
     echo "smoke: no Settings window found" >&2
 fi

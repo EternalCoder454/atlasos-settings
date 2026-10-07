@@ -2,7 +2,7 @@
 //! so the clients are tested without the machine's own services.
 //!
 //! Without dbus-daemon or python-dbusmock the tests skip, unless
-//! `ATLAS_REQUIRE_DBUSMOCK=1` (CI and `scripts/dev.sh` set it), when they fail.
+//! `TELAMON_REQUIRE_DBUSMOCK=1` (CI and `scripts/dev.sh` set it), when they fail.
 
 #![allow(dead_code)]
 
@@ -49,8 +49,10 @@ impl MockBus {
     pub fn start() -> Option<MockBus> {
         let ok = have("dbus-daemon", &["--version"]) && have("python3", &["-c", "import dbusmock"]);
         if !ok {
-            if std::env::var("ATLAS_REQUIRE_DBUSMOCK").as_deref() == Ok("1") {
-                panic!("dbus-daemon and python3-dbusmock are required (ATLAS_REQUIRE_DBUSMOCK=1)");
+            if std::env::var("TELAMON_REQUIRE_DBUSMOCK").as_deref() == Ok("1") {
+                panic!(
+                    "dbus-daemon and python3-dbusmock are required (TELAMON_REQUIRE_DBUSMOCK=1)"
+                );
             }
             eprintln!("skipped: no dbus-daemon or python3-dbusmock");
             return None;

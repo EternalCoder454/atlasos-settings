@@ -2,12 +2,12 @@
 //! window is handed:
 //!
 //! ```text
-//! atlas-settings                         the first page
-//! atlas-settings <page> [<setting>]      a page, scrolled to one setting
-//! atlas-settings --page <page>           the same
-//! atlas-settings --kcm <name> [--args <text>]
+//! telamon-settings                         the first page
+//! telamon-settings <page> [<setting>]      a page, scrolled to one setting
+//! telamon-settings --page <page>           the same
+//! telamon-settings --kcm <name> [--args <text>]
 //!                                        what that KCM name opens (kcm::resolve)
-//! atlas-settings --search <text>         search
+//! telamon-settings --search <text>         search
 //! ```
 //!
 //! Everything here is untrusted (any program can start Settings with any

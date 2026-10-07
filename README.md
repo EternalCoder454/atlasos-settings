@@ -1,10 +1,11 @@
-# Settings
+# Telamon Settings
 
-The settings app of [AtlasOS](https://github.com/EternalCoder454/AtlasOS). It
-replaces KDE System Settings with fifteen pages instead of dozens: Home,
+The settings app of [Telamon OS](https://github.com/EternalCoder454/AtlasOS). It
+replaces KDE System Settings with sixteen pages instead of dozens: Home,
 Network, Bluetooth & Devices, Displays, Sound, Keyboard & Mouse, Appearance,
 Notifications, Apps, Privacy & Security, Users, Power & Battery,
-Accessibility, Time & Language and System.
+Accessibility, Time & Language, System and Updates (what Telamon Updater's
+window was).
 
 - One window, its pages down a sidebar. Each page shows the settings most
   people change; the rest fold under Advanced. Search finds every setting.
@@ -13,8 +14,8 @@ Accessibility, Time & Language and System.
   is needed. Settings has no privileged helper of its own.
 - Plasma settings it has no page or row for are under Other Plasma Settings
   and open Plasma's own page.
-- Other apps can open a page: `atlas-settings devices`,
-  `atlas-settings --kcm kcm_bluetooth`, `atlas-settings --search "dark mode"`.
+- Other apps can open a page: `telamon-settings devices`,
+  `telamon-settings --kcm kcm_bluetooth`, `telamon-settings --search "dark mode"`.
 
 Built with Rust, Qt 6 Quick and Kirigami on
 [atlas-framework](https://github.com/EternalCoder454/atlas-framework). See

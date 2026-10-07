@@ -1,0 +1,17 @@
+# Alias for pins and launchers that still look up the old desktop file
+# (net.eterneon.atlas.settings.desktop); starts the same program. Dropped in
+# the release after this one.
+[Desktop Entry]
+Type=Application
+Name=Telamon Settings
+GenericName=System Settings
+Comment=Set up Wi-Fi, displays, sound, appearance and more
+Exec=telamon-settings
+Icon=net.eterneon.telamon.settings
+Terminal=false
+Categories=Qt;KDE;Settings;
+Keywords=settings;preferences;configuration;control center;system settings;wifi;network;bluetooth;display;sound;appearance;wallpaper;power;users;keyboard;mouse;
+StartupNotify=true
+SingleMainWindow=true
+X-KDE-StartupNotify=true
+NoDisplay=true

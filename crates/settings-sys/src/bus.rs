@@ -4,7 +4,7 @@ use crate::{Error, ErrorKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
-use zbus::blocking::{Connection, connection};
+use zbus::blocking::Connection;
 
 /// How long a method call may take before it fails with
 /// [`ErrorKind::Timeout`](crate::ErrorKind::Timeout). Calls that wait for a
@@ -88,12 +88,20 @@ impl Bus {
     }
 
     fn build(&self, timeout: Duration) -> Result<Connection, Error> {
+        // The async builder under async-io's own `block_on`, not the blocking
+        // builder: when something else in the program turns on zbus's tokio
+        // backend (the framework's notifier does), the blocking builder runs
+        // on a throw-away tokio runtime, and the connection it makes keeps
+        // tokio as its executor after that runtime is gone (a later
+        // `Proxy` drop panics: "there is no reactor running"). Built here,
+        // outside any tokio runtime, the connection keeps its own executor.
         let builder = match self {
-            Bus::System => connection::Builder::system()?,
-            Bus::Session => connection::Builder::session()?,
-            Bus::Address(a) => connection::Builder::address(a.as_str())?,
+            Bus::System => zbus::connection::Builder::system()?,
+            Bus::Session => zbus::connection::Builder::session()?,
+            Bus::Address(a) => zbus::connection::Builder::address(a.as_str())?,
         };
-        Ok(builder.method_timeout(timeout).build()?)
+        let conn = async_io::block_on(builder.method_timeout(timeout).build())?;
+        Ok(Connection::from(conn))
     }
 
     /// A new connection with the usual [`METHOD_TIMEOUT`].
