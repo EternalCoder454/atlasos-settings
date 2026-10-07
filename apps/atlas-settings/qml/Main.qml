@@ -42,7 +42,9 @@ AtlasWindow {
             "system": systemPage,
             "home": homePage,
             "network": networkPage,
-            "devices": devicesPage
+            "devices": devicesPage,
+            "displays": displaysPage,
+            "sound": soundPage
         })
 
     title: AtlasApp.name
@@ -318,6 +320,30 @@ AtlasWindow {
     Component {
         id: devicesPage
         DevicesPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: displaysPage
+        DisplaysPage {
+            entry: root.currentPage
+            itemId: root.itemId
+            pages: root.pages
+            pageBackends: root.pageBackends
+            onOpenPage: (id, item) => root.openPage(id, item)
+            onOpenKcm: name => root.openKcm(name, "")
+            onRun: argv => root.run(argv)
+        }
+    }
+    Component {
+        id: soundPage
+        SoundPage {
             entry: root.currentPage
             itemId: root.itemId
             pages: root.pages
