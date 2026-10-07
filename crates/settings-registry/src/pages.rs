@@ -140,7 +140,15 @@ pub static PAGES: &[Page] = &[
         kind: Kind::Native,
         keywords: &["start", "overview", "quick settings"],
         items: &[],
-        related: &[],
+        // The pages people use most, as links on Home.
+        related: &[
+            "network",
+            "devices",
+            "displays",
+            "sound",
+            "appearance",
+            "system",
+        ],
     },
     Page {
         id: "network",

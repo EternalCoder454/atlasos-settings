@@ -142,6 +142,61 @@ the page, and a result that comes back after the page is gone is dropped.
   `/proc` and `/sys` and the PCI ID database, capped and made safe to show
   (`settings_sys::sysinfo`); nothing privileged.
 
+## Network, Bluetooth & Devices and Home
+
+- **Network** is NetworkManager's, through `settings_sys::network`: Wi-Fi on
+  or off (`WirelessEnabled`), the networks in range (one row per name, the
+  strongest access point; the one in use first, then the saved ones), wired
+  status, VPN connections (`vpn` and `wireguard` profiles, connected and
+  disconnected from the row), the hotspot and airplane mode. A network opens
+  in a sheet (status, signal, security; Join with a password, Connect,
+  Disconnect, Forget); a new password goes to NetworkManager in the
+  `AddAndActivateConnection` call and is never stored or logged
+  (`network::Secret` hides it from `Debug` and overwrites it when dropped). A
+  network that doesn't come up within 30 s, or is refused, is not kept. WPA,
+  WPA3 and WEP passwords are checked before they are sent; networks that need
+  a login (802.1X) are set up in Plasma's editor (`kcm_networkmanagement`,
+  which a sheet and "Add a VPN" open). The hotspot is one saved profile
+  (`mode=ap`, `ipv4.method=shared`, WPA2): the switch starts the saved one, or
+  asks for a name and a made-up password the first time; "Change…" replaces
+  it. Airplane mode switches Wi-Fi and mobile broadband (NetworkManager) and
+  Bluetooth (BlueZ) off together. SSIDs and connection names are decoded
+  lossily, capped at 32 and 64 characters and cleaned like other D-Bus text;
+  hidden networks (no name) aren't listed.
+- **Bluetooth & Devices** is BlueZ's, through `settings_sys::bluetooth`: one
+  `GetManagedObjects` read gives the adapter and its devices, which the page
+  names by address (the client looks the object path up itself, so a page
+  never sends a path). Paired devices are always listed; an unpaired one only
+  while it is in range and names itself. A click pairs, trusts and connects a
+  nearby device; a paired one opens a sheet (connect, disconnect, forget,
+  battery from `Battery1`). Pairing that needs a PIN or a confirmation is
+  asked by the session's Bluetooth agent (Plasma's BlueDevil): Settings
+  registers none of its own yet. Looking for devices runs on a thread of its
+  own that holds the D-Bus connection (BlueZ ends a client's search when its
+  connection goes), only while the page is shown, Bluetooth is on and the
+  window isn't minimized, and ends when the page goes. Visible to Other
+  Devices (Advanced) is the adapter's `Discoverable`; BlueZ turns it off after
+  its own timeout. Printers opens `kcm_printer_manager`.
+- **Both pages look again while shown** (every 6 s and 3 s, not while the
+  window is minimized) instead of subscribing to D-Bus signals, so a page has
+  no watcher thread to end; each read runs on a worker thread and is skipped
+  while another is under way or a change is in progress.
+- **Home** is the device name and the system's name, three switches (Wi-Fi
+  and Bluetooth, which use the Network and Bluetooth backends; Dark Mode) and
+  links to six pages (the registry's `related` for `home`). Dark Mode reads
+  `[General] ColorScheme` of `kdeglobals` through KConfig
+  (`cpp/colorscheme.cpp`) and switches between the image's `AtlasOSLight` and
+  `AtlasOSDark` by starting `plasma-apply-colorscheme <name>` through the
+  Launcher (argv, `/usr/bin` only); Plasma writes the file and repaints. The
+  Appearance page does the same with the same two names.
+- **Smoke runs with services:** a debug build started with
+  `ATLAS_SETTINGS_TEST_BUS=<address>` uses that bus instead of the system bus
+  (`src/support.rs`; release builds ignore it).
+  `scripts/with-mock-services.py <command>` starts a private bus with
+  python-dbusmock's NetworkManager and BlueZ, filled with a few networks and
+  devices, and runs the command with the variable set:
+  `scripts/dev.sh scripts/with-mock-services.py scripts/smoke.sh network`.
+
 ## Displays and Sound
 
 Both are QML pages over a small C++ QObject made by `PageBackends` when the

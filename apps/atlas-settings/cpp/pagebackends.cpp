@@ -1,5 +1,6 @@
 #include "pagebackends.h"
 
+#include "colorscheme.h"
 #include "localeconfig.h"
 #include "nightlight.h"
 #include "screenconfig.h"
@@ -22,6 +23,8 @@ QObject *PageBackends::create(const QString &kind, QObject *parent)
         object = new NightLight;
     } else if (kind == QLatin1String("sound")) {
         object = new SoundMixer;
+    } else if (kind == QLatin1String("color-scheme")) {
+        object = new ColorSchemeConfig;
     } else {
         object = static_cast<QObject *>(atlas_page_backend_new(kind.toUtf8().constData()));
     }
