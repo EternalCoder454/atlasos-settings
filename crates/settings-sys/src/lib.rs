@@ -10,10 +10,12 @@
 //! The tests run each client against python-dbusmock's model of the service
 //! on a private bus (`tests/common`), never the machine's own services.
 
+pub mod bluetooth;
 pub mod bus;
 pub mod error;
 pub mod hostname;
 pub mod locale;
+pub mod network;
 pub mod sysinfo;
 pub mod timedate;
 

@@ -5,7 +5,8 @@
 // Makes a page's backend when the page is shown, parented to the page so it
 // goes when the page does (docs/DESIGN.md, "Threads"). The Rust ones come
 // from src/lib.rs (atlas_page_backend_new); `locale-config` is the KConfig
-// side of Time & Language (localeconfig.h).
+// side of Time & Language (localeconfig.h); `color-scheme` is Home's Light or
+// Dark switch (colorscheme.h).
 class PageBackends : public QObject
 {
     Q_OBJECT

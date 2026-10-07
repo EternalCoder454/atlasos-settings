@@ -73,6 +73,7 @@ qt_add_executable(atlas-settings-app
     cpp/launcher.cpp
     cpp/kcmcatalog.cpp
     cpp/localeconfig.cpp
+    cpp/colorscheme.cpp
     cpp/pagebackends.cpp)
 set_target_properties(atlas-settings-app PROPERTIES OUTPUT_NAME atlas-settings)
 target_include_directories(atlas-settings-app PRIVATE "${ATLAS_UI_CRATE_DIR}/include")
@@ -94,6 +95,9 @@ qt_add_qml_module(atlas-settings-app
         qml/TimeLanguagePage.qml
         qml/PickerSheet.qml
         qml/SystemPage.qml
+        qml/NetworkPage.qml
+        qml/DevicesPage.qml
+        qml/HomePage.qml
 )
 
 target_link_libraries(atlas-settings-app PRIVATE
