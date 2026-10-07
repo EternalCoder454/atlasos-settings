@@ -1,5 +1,5 @@
 //! The registry against the KCM names Plasma 6.7 really has
-//! (`fixtures/kcms-plasma-6.7.txt`) and the ones its applets and AtlasOS's
+//! (`fixtures/kcms-plasma-6.7.txt`) and the ones its applets and Telamon OS's
 //! scripts open.
 
 use settings_registry::PAGES;
@@ -12,7 +12,7 @@ fn installed() -> Vec<&'static str> {
         .collect()
 }
 
-/// In the AtlasOS image but not in the fixture's Plasma: plasma-firewall,
+/// In the Telamon OS image but not in the fixture's Plasma: plasma-firewall,
 /// and kinfocenter's energy page (kinfocenter is removed from the image,
 /// but the battery applet still asks for it).
 const IMAGE_ONLY: &[&str] = &["kcm_firewall", "kcm_energyinfo"];
@@ -46,7 +46,7 @@ fn every_mapped_or_linked_kcm_exists() {
     }
 }
 
-/// What Plasma's applets (KCMLauncher), Dolphin and AtlasOS's scripts ask
+/// What Plasma's applets (KCMLauncher), Dolphin and Telamon OS's scripts ask
 /// for, and where each must land.
 #[test]
 fn callers_land_on_their_page() {

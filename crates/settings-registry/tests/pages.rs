@@ -111,8 +111,8 @@ fn renamed_pages_land_on_real_pages() {
 }
 
 #[test]
-fn symbols_exist_in_atlas_ui_1_4() {
-    let names: HashSet<&str> = include_str!("fixtures/symbols-atlas-ui-1.4.0.txt")
+fn symbols_exist_in_telamon_ui_2_0() {
+    let names: HashSet<&str> = include_str!("fixtures/symbols-telamon-ui-2.0.0.txt")
         .lines()
         .filter(|l| !l.starts_with('#'))
         .collect();

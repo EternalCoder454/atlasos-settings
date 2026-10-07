@@ -6,13 +6,13 @@
 # rapid input, restart and 1.5x scale. Saves numbered screenshots and a
 # PASS/FAIL summary; exits non-zero if any check failed.
 #   scripts/ui-stress.sh
-# Env: ATLAS_SETTINGS_BIN (default /work/cmake/dev/atlas-settings),
+# Env: TELAMON_SETTINGS_BIN (default /work/cmake/dev/telamon-settings),
 #      UI_STRESS_OUT (default /work/ui-stress/out; must be under
 #      /work/ui-stress; wiped at start).
 # Sidebar click coordinates are window-relative at QT_SCALE_FACTOR=1
 # (window 1008x720) and may need adjusting if the layout changes.
 
-bin=${ATLAS_SETTINGS_BIN:-/work/cmake/dev/atlas-settings}
+bin=${TELAMON_SETTINGS_BIN:-/work/cmake/dev/telamon-settings}
 out=${UI_STRESS_OUT:-/work/ui-stress/out}
 base=/work/ui-stress
 root=$base/xdg
@@ -51,7 +51,7 @@ CONF
     exec dbus-run-session --config-file="$base/bus.conf" -- xvfb-run -a -s "-screen 0 1920x1080x24" "$0" --inner "$@"
 fi
 shift
-# The teardown kills every atlas-settings and kcmshell6: only in the dev
+# The teardown kills every telamon-settings and kcmshell6: only in the dev
 # container, never on the desktop.
 if [ ! -e /run/.containerenv ] || [ ! -d /work ]; then
     echo "ui-stress: runs only inside the dev container (scripts/dev.sh)" >&2
@@ -83,13 +83,13 @@ check() { # check <description> <command...>: PASS when the command succeeds
 }
 
 alive() { [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; }
-count_app() { pgrep -x atlas-settings | wc -l; }
+count_app() { pgrep -x telamon-settings | wc -l; }
 one_instance() { [ "$(count_app)" -eq 1 ]; }
 
 find_window() { # prints the window id, waits up to ~10 s
     local i w
     for i in $(seq 1 50); do
-        w=$(xdotool search --onlyvisible --name '^Settings' 2>/dev/null | head -1 || true)
+        w=$(xdotool search --onlyvisible --name '^Telamon Settings' 2>/dev/null | head -1 || true)
         if [ -n "$w" ]; then
             echo "$w"
             return 0
@@ -156,18 +156,18 @@ focus_win() {
 
 key() { xdotool key --delay 80 "$@"; sleep 0.4; }
 
-settingsrc=$XDG_CONFIG_HOME/atlas-settingsrc
+settingsrc=$XDG_CONFIG_HOME/telamon-settingsrc
 has_page_saved() { grep -q '^Page=' "$settingsrc" 2>/dev/null; }
 
 cleanup() {
     stop_app
     pkill -x kcmshell6 2>/dev/null || true
-    pkill -x atlas-settings 2>/dev/null || true
+    pkill -x telamon-settings 2>/dev/null || true
     sleep 0.5
-    if [ "$(pgrep -x atlas-settings | wc -l)" -eq 0 ] && [ "$(pgrep -x kcmshell6 | wc -l)" -eq 0 ]; then
-        pass "teardown: no atlas-settings or kcmshell6 left"
+    if [ "$(pgrep -x telamon-settings | wc -l)" -eq 0 ] && [ "$(pgrep -x kcmshell6 | wc -l)" -eq 0 ]; then
+        pass "teardown: no telamon-settings or kcmshell6 left"
     else
-        fail "teardown: atlas-settings or kcmshell6 still running"
+        fail "teardown: telamon-settings or kcmshell6 still running"
     fi
     if grep -nE 'qrc:|\.qml:[0-9]+|TypeError|ReferenceError|is not defined|Cannot assign|Unable to assign' "$out"/app-*.log >"$out/qml-problems.txt" 2>&1; then
         fail "QML problems in the logs (see $out/qml-problems.txt)"
@@ -250,7 +250,7 @@ for args in "bluetooth" "displays night-light" "--search sound" "--kcm kcm_night
         fail "4 second launch '$args' hung"
     fi
     shot "deeplink-$(echo "$args" | tr -c 'a-z0-9\n' '-')"
-    check "4 exactly one atlas-settings after '$args'" one_instance
+    check "4 exactly one telamon-settings after '$args'" one_instance
 done
 # --bogus changes no page: only the banner saying it was ignored.
 check "4 --bogus shows a banner" differs "$prev" "$LAST_SHOT"
@@ -322,7 +322,7 @@ key ctrl+a BackSpace
 # 7. Restart: the last page comes back.
 click 70 135
 stop_app
-check "7 atlas-settingsrc has Page=" has_page_saved
+check "7 telamon-settingsrc has Page=" has_page_saved
 if start_app; then
     shot restart
     check "7 app alive after restart" alive

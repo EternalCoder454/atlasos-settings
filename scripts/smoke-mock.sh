@@ -4,7 +4,7 @@
 # without touching the machine's own services. Inside the dev container:
 #   SMOKE_OUT=/work/smoke/<name> SMOKE_SCENARIO=laptop scripts/dev.sh scripts/smoke-mock.sh [app arguments]
 # Scenarios: desktop (default; no battery, no fingerprint reader) and laptop.
-# SMOKE_DARK=1 starts the app with the AtlasOS dark colour scheme.
+# SMOKE_DARK=1 starts the app with the Telamon OS dark colour scheme.
 # SMOKE_SERVICES (default all): power accounts fprintd firewalld permissions apps.
 set -euo pipefail
 

@@ -4,23 +4,26 @@
 # (shared with the other Atlas apps).
 #   scripts/dev.sh <command...>     e.g. scripts/dev.sh cargo test --workspace
 #   scripts/dev.sh                  an interactive shell
-# /work is $ATLAS_SETTINGS_WORK, by default ~/.cache/claude-builds/atlas-settings:
+# /work is $TELAMON_SETTINGS_WORK, by default ~/.cache/claude-builds/telamon-settings:
 # on disk, outside the repo (cargo's target dirs, CMake build dirs, smoke-run
 # XDG dirs). Set CARGO_TARGET_DIR to /work/target/<name> to keep one target
 # dir per task.
 # The first run installs the build dependencies from the spec (cached after),
 # and python-dbusmock, which the settings-sys tests run the system services
 # with on a private bus. Since the image has it, those tests fail rather than
-# skip here (ATLAS_REQUIRE_DBUSMOCK=1 unless set otherwise).
-# Atlas.Ui comes installed (atlas-ui, from atlas-framework), which no
-# repository has: the first run needs ATLAS_LOCAL_RPMS=<dir with its RPMs>
+# skip here (TELAMON_REQUIRE_DBUSMOCK=1 unless set otherwise).
+# Telamon.Ui comes installed (telamon-ui, from atlas-framework), which no
+# repository has: the first run needs TELAMON_LOCAL_RPMS=<dir with its RPMs>
 # (built with atlas-framework's packaging/build-rpm.sh). Given later, the
 # image takes those RPMs when they are another build than the one it has.
 set -euo pipefail
 
+# The old name of the variable still works.
+TELAMON_LOCAL_RPMS=${TELAMON_LOCAL_RPMS:-${ATLAS_LOCAL_RPMS:-}}
+
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-image=localhost/atlas-settings-dev:44
-work=${ATLAS_SETTINGS_WORK:-$HOME/.cache/claude-builds/atlas-settings}
+image=localhost/telamon-settings-dev:44
+work=${TELAMON_SETTINGS_WORK:-$HOME/.cache/claude-builds/telamon-settings}
 mkdir -p "$work"
 # The tools the image has besides the spec's build dependencies: clippy and
 # rustfmt, Xvfb, xdotool, ImageMagick and procps (smoke and UI stress runs),
@@ -29,14 +32,14 @@ tools="dnf5-plugins rpm-build clippy rustfmt xorg-x11-server-Xvfb dbus-daemon
     qt6-qtbase-gui kf6-qqc2-desktop-style breeze-icon-theme ImageMagick xdotool
     procps-ng ccache python3-dbusmock"
 # The image is refreshed when either the spec or that list changes.
-spec_sum=$({ cat "$repo/packaging/atlas-settings.spec"; echo "$tools"; } | sha256sum | cut -d' ' -f1)
+spec_sum=$({ cat "$repo/packaging/telamon-settings.spec"; echo "$tools"; } | sha256sum | cut -d' ' -f1)
 
-# The atlas-ui and atlas-symbols-fonts RPMs in $ATLAS_LOCAL_RPMS: exactly one
+# The telamon-ui and telamon-symbols-fonts RPMs in $TELAMON_LOCAL_RPMS: exactly one
 # of each, or nothing is changed.
 local_rpms() {
     local dir=$1 name f
     local -a found
-    for name in atlas-ui atlas-symbols-fonts; do
+    for name in telamon-ui telamon-symbols-fonts; do
         found=()
         for f in "$dir/$name"-[0-9]*.rpm; do
             [ -e "$f" ] && [[ $f != *.src.rpm ]] && found+=("${f##*/}")
@@ -51,24 +54,24 @@ local_rpms() {
 
 new=1
 podman image exists "$image" && new=0
-if [ "$new" = 1 ] && [ -z "${ATLAS_LOCAL_RPMS:-}" ]; then
-    echo "dev.sh: the first run needs ATLAS_LOCAL_RPMS=<dir with the atlas-ui and atlas-symbols-fonts RPMs>" >&2
+if [ "$new" = 1 ] && [ -z "${TELAMON_LOCAL_RPMS:-}" ]; then
+    echo "dev.sh: the first run needs TELAMON_LOCAL_RPMS=<dir with the telamon-ui and telamon-symbols-fonts RPMs>" >&2
     exit 1
 fi
-if [ -n "${ATLAS_LOCAL_RPMS:-}" ]; then
-    rpms=$(cd "$ATLAS_LOCAL_RPMS" && pwd)
+if [ -n "${TELAMON_LOCAL_RPMS:-}" ]; then
+    rpms=$(cd "$TELAMON_LOCAL_RPMS" && pwd)
     mapfile -t files < <(local_rpms "$rpms")
     [ "${#files[@]}" = 2 ] || exit 1
     # Which build: the label the image was committed with.
     build=$(cd "$rpms" && rpm -qp --qf '%{NEVRA}-%{BUILDTIME},' "${files[@]}")
-    have=$([ "$new" = 1 ] || podman image inspect --format '{{index .Labels "atlas-ui"}}' "$image")
+    have=$([ "$new" = 1 ] || podman image inspect --format '{{index .Labels "telamon-ui"}}' "$image")
     if [ "$build" != "$have" ]; then
         # From the clean base each time (the dnf cache makes it quick), so
         # refreshes don't stack layers on the old image.
         # No relabelling, as for /src below. The RPMs are copied in, not
-        # mounted: only these two files of $ATLAS_LOCAL_RPMS are read.
+        # mounted: only these two files of $TELAMON_LOCAL_RPMS are read.
         ctr=$(podman run -d --security-opt label=disable -v "$repo/packaging":/packaging:ro \
-            -v atlas-dnf:/var/cache/libdnf5 \
+            -v telamon-dnf:/var/cache/libdnf5 \
             registry.fedoraproject.org/fedora:44 sleep infinity)
         trap 'podman rm -f -t 0 "$ctr" >/dev/null' EXIT
         podman exec "$ctr" mkdir /rpms
@@ -88,8 +91,8 @@ if [ -n "${ATLAS_LOCAL_RPMS:-}" ]; then
             rpm -U --replacepkgs --oldpackage "$@"
             cd /
             rm -r /rpms
-            dnf -y builddep /packaging/atlas-settings.spec' bash "${files[@]}" >&2
-        podman commit --change "LABEL atlas-ui=$build" --change "LABEL spec=$spec_sum" \
+            dnf -y builddep /packaging/telamon-settings.spec' bash "${files[@]}" >&2
+        podman commit --change "LABEL telamon-ui=$build" --change "LABEL spec=$spec_sum" \
             "$ctr" "$image" >/dev/null
         podman rm -f -t 0 "$ctr" >/dev/null
         trap - EXIT
@@ -97,13 +100,13 @@ if [ -n "${ATLAS_LOCAL_RPMS:-}" ]; then
 fi
 
 # A changed spec (new BuildRequires) or tools list installs them into the
-# image, keeping its Atlas.Ui.
+# image, keeping its Telamon.Ui.
 if [ "$(podman image inspect --format '{{index .Labels "spec"}}' "$image")" != "$spec_sum" ]; then
     ctr=$(podman run -d --security-opt label=disable -v "$repo/packaging":/packaging:ro \
-        -v atlas-dnf:/var/cache/libdnf5 "$image" sleep infinity)
+        -v telamon-dnf:/var/cache/libdnf5 "$image" sleep infinity)
     trap 'podman rm -f -t 0 "$ctr" >/dev/null' EXIT
     # shellcheck disable=SC2016,SC2086 # $TOOLS is split on purpose, in the container
-    podman exec -e TOOLS="$tools" "$ctr" bash -c 'dnf -y install $TOOLS && dnf -y builddep /packaging/atlas-settings.spec' >&2
+    podman exec -e TOOLS="$tools" "$ctr" bash -c 'dnf -y install $TOOLS && dnf -y builddep /packaging/telamon-settings.spec' >&2
     podman commit --change "LABEL spec=$spec_sum" "$ctr" "$image" >/dev/null
     podman rm -f -t 0 "$ctr" >/dev/null
     trap - EXIT
@@ -117,11 +120,11 @@ tty=()
 exec podman run --rm "${tty[@]}" --security-opt label=disable \
     -v "$repo":/src -w /src \
     -v "$work":/work \
-    -v atlas-cargo:/root/.cargo/registry \
-    -v atlas-cargo-git:/root/.cargo/git \
-    -v atlas-settings-ccache:/root/.cache/ccache \
+    -v telamon-cargo:/root/.cargo/registry \
+    -v telamon-cargo-git:/root/.cargo/git \
+    -v telamon-settings-ccache:/root/.cache/ccache \
     -e CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/work/target/dev}" \
-    -e ATLAS_REQUIRE_DBUSMOCK="${ATLAS_REQUIRE_DBUSMOCK:-1}" \
+    -e TELAMON_REQUIRE_DBUSMOCK="${TELAMON_REQUIRE_DBUSMOCK:-1}" \
     "$image" bash -c '
         # C++ through ccache (its own volume), so a new build dir or a
         # rebuild after a header change reuses what was compiled before.

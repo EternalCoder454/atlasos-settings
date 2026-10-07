@@ -6,12 +6,12 @@
 # scripts/ui-stress.sh. Search per keystroke is the ignored test
 # crates/settings-registry/tests/search_speed.rs.
 #   scripts/bench.sh
-# Env: ATLAS_SETTINGS_BIN (default /work/cmake/rel/atlas-settings).
+# Env: TELAMON_SETTINGS_BIN (default /work/cmake/rel/telamon-settings).
 # Prints one line per measure and writes /work/bench/results.txt; it only
 # reports against the budgets, it doesn't fail on them. Page IDs are read
 # from the registry's source (pages.rs).
 
-bin=${ATLAS_SETTINGS_BIN:-/work/cmake/rel/atlas-settings}
+bin=${TELAMON_SETTINGS_BIN:-/work/cmake/rel/telamon-settings}
 base=/work/bench
 root=$base/xdg
 
@@ -56,7 +56,7 @@ stop() {
     fi
     pid=
 }
-trap 'stop; pkill -x atlas-settings 2>/dev/null; pkill -x kcmshell6 2>/dev/null' EXIT
+trap 'stop; pkill -x telamon-settings 2>/dev/null; pkill -x kcmshell6 2>/dev/null' EXIT
 # A signal (run.sh's timeout, Ctrl+C) runs the EXIT trap too.
 trap 'exit 143' TERM INT HUP
 
@@ -75,7 +75,7 @@ for i in $(seq 0 7); do
     t0=$(now_ms)
     "$bin" >"$base/app-$i.log" 2>&1 &
     pid=$!
-    if ! timeout 15 xdotool search --sync --onlyvisible --name '^Settings' >/dev/null 2>&1 || ! kill -0 "$pid" 2>/dev/null; then
+    if ! timeout 15 xdotool search --sync --onlyvisible --name '^Telamon Settings' >/dev/null 2>&1 || ! kill -0 "$pid" 2>/dev/null; then
         say "FAIL: launch $i showed no window"
         exit 1
     fi

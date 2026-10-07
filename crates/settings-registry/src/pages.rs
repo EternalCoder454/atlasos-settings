@@ -18,7 +18,7 @@ pub enum Kind {
 }
 
 /// One setting on a page: what search finds and what a deep link
-/// (`atlas-settings <page> <item>`) scrolls to.
+/// (`telamon-settings <page> <item>`) scrolls to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Item {
     pub id: &'static str,
@@ -36,7 +36,7 @@ pub struct Item {
 pub struct Page {
     pub id: &'static str,
     pub title: &'static str,
-    /// An Atlas.Ui `Symbols` name (`Symbols.codepoint(name)` in QML).
+    /// A Telamon.Ui `Symbols` name (`Symbols.codepoint(name)` in QML).
     pub symbol: &'static str,
     pub kind: Kind,
     /// Other words people search with (lower case).
@@ -345,7 +345,11 @@ pub static PAGES: &[Page] = &[
             adv("top-bar", "Top Bar", &["menu bar", "clock", "panel"]),
             adv("hot-corners", "Hot Corners", &["screen edges", "corner"]),
             adv("desktops", "Virtual Desktops", &["workspaces", "pager"]),
-            adv("theme", "Global Theme", &["look and feel", "atlasos theme"]),
+            adv(
+                "theme",
+                "Global Theme",
+                &["look and feel", "atlasos theme", "telamon theme"],
+            ),
             adv_kcm(
                 "fonts",
                 "Fonts",
@@ -613,9 +617,19 @@ pub static PAGES: &[Page] = &[
             item(
                 "updates",
                 "Updates",
-                &["upgrade", "software update", "atlas updater", "bootc"],
+                &[
+                    "upgrade",
+                    "software update",
+                    "atlas updater",
+                    "telamon updater",
+                    "bootc",
+                ],
             ),
-            item("version", "AtlasOS Version", &["image", "bootc", "release"]),
+            item(
+                "version",
+                "Telamon OS Version",
+                &["atlasos", "image", "bootc", "release"],
+            ),
             item(
                 "hardware",
                 "Hardware",

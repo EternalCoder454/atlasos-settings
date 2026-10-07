@@ -1,6 +1,6 @@
 //! KCM names: which page each one opens, and which stay Plasma's.
 //!
-//! Plasma's applets, Dolphin and AtlasOS's own scripts open settings by KCM
+//! Plasma's applets, Dolphin and Telamon OS's own scripts open settings by KCM
 //! name (`systemsettings kcm_x`, `kcmshell6 kcm_x`, KCMLauncher). Settings
 //! answers those names: a KCM in [`MAP`] opens that page; any other valid
 //! name opens the KCM itself in kcmshell6.
@@ -22,7 +22,7 @@ pub enum Target {
 }
 
 /// The KCMs a Settings page replaces, and the setting each one shows.
-/// Names that only exist in the AtlasOS image (plasma-firewall,
+/// Names that only exist in the Telamon OS image (plasma-firewall,
 /// kinfocenter's energy page) are here too: their callers are.
 pub static MAP: &[(&str, &str, Option<&str>)] = &[
     ("kcm_networkmanagement", "network", None),

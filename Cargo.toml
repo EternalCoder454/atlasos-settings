@@ -1,9 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/settings-registry", "crates/settings-sys", "apps/atlas-settings"]
+members = ["crates/settings-registry", "crates/settings-sys", "apps/telamon-settings"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/EternalCoder454/atlasos-settings"
@@ -11,9 +11,9 @@ rust-version = "1.89"
 
 [workspace.dependencies]
 # The atlas-framework crates (startup, settings, logging, crash reports,
-# polkit, Flatpak); to move the pin, see CLAUDE.md. Atlas.Ui is not pinned
-# here: it is the installed atlas-ui package.
-atlas-framework-ui = { git = "https://github.com/EternalCoder454/atlas-framework", tag = "v1.6.0" }
+# polkit, Flatpak); to move the pin, see CLAUDE.md. Telamon.Ui is not pinned
+# here: it is the installed telamon-ui package.
+telamon-framework-ui = { git = "https://github.com/EternalCoder454/atlas-framework", tag = "v2.0.0" }
 log = { version = "0.4", features = ["std"] }
 settings-registry = { path = "crates/settings-registry" }
 settings-sys = { path = "crates/settings-sys" }
