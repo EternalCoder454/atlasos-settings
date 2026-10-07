@@ -42,6 +42,8 @@ pub struct Page {
     /// Other words people search with (lower case).
     pub keywords: &'static [&'static str],
     pub items: &'static [Item],
+    /// Pages people often want next, shown as links at the page's end.
+    pub related: &'static [&'static str],
 }
 
 impl Page {
@@ -138,6 +140,7 @@ pub static PAGES: &[Page] = &[
         kind: Kind::Native,
         keywords: &["start", "overview", "quick settings"],
         items: &[],
+        related: &[],
     },
     Page {
         id: "network",
@@ -170,6 +173,7 @@ pub static PAGES: &[Page] = &[
                 "kcm_cellular_network",
             ),
         ],
+        related: &[],
     },
     Page {
         id: "devices",
@@ -213,6 +217,7 @@ pub static PAGES: &[Page] = &[
                 "kcm_gamecontroller",
             ),
         ],
+        related: &[],
     },
     Page {
         id: "displays",
@@ -246,6 +251,7 @@ pub static PAGES: &[Page] = &[
             adv("orientation", "Orientation", &["rotate", "portrait"]),
             adv("hdr", "HDR", &["high dynamic range", "brightness"]),
         ],
+        related: &[],
     },
     Page {
         id: "sound",
@@ -269,6 +275,7 @@ pub static PAGES: &[Page] = &[
                 "kcm_soundtheme",
             ),
         ],
+        related: &[],
     },
     Page {
         id: "input",
@@ -305,6 +312,7 @@ pub static PAGES: &[Page] = &[
                 "kcm_virtualkeyboard",
             ),
         ],
+        related: &[],
     },
     Page {
         id: "appearance",
@@ -356,6 +364,7 @@ pub static PAGES: &[Page] = &[
                 "kcm_kwinoptions",
             ),
         ],
+        related: &[],
     },
     Page {
         id: "notifications",
@@ -369,6 +378,7 @@ pub static PAGES: &[Page] = &[
             adv("popups", "Popups", &["banner", "position", "timeout"]),
             adv("lock-screen", "On the Lock Screen", &["privacy"]),
         ],
+        related: &[],
     },
     Page {
         id: "apps",
@@ -415,6 +425,7 @@ pub static PAGES: &[Page] = &[
                 "kcm_filetypes",
             ),
         ],
+        related: &[],
     },
     Page {
         id: "privacy",
@@ -461,6 +472,7 @@ pub static PAGES: &[Page] = &[
                 "kcm_baloofile",
             ),
         ],
+        related: &[],
     },
     Page {
         id: "users",
@@ -486,6 +498,7 @@ pub static PAGES: &[Page] = &[
                 "kcm_plasmalogin",
             ),
         ],
+        related: &[],
     },
     Page {
         id: "power",
@@ -519,6 +532,7 @@ pub static PAGES: &[Page] = &[
                 &["battery health", "threshold"],
             ),
         ],
+        related: &[],
     },
     Page {
         id: "accessibility",
@@ -538,6 +552,7 @@ pub static PAGES: &[Page] = &[
                 &["modifier keys", "slow keys", "bounce keys"],
             ),
         ],
+        related: &[],
     },
     Page {
         id: "time-language",
@@ -571,7 +586,13 @@ pub static PAGES: &[Page] = &[
                 "Formats",
                 &["numbers", "currency", "date format", "measurement", "units"],
             ),
+            adv(
+                "system-language",
+                "Login Screen Language",
+                &["system locale", "new users", "localed"],
+            ),
         ],
+        related: &["input", "system"],
     },
     Page {
         id: "system",
@@ -606,6 +627,7 @@ pub static PAGES: &[Page] = &[
                 &["kde", "kcm", "system settings", "more settings"],
             ),
         ],
+        related: &["time-language", "users", "privacy"],
     },
     // Not in the sidebar: System's "Other Plasma Settings" opens it, and
     // search and links can.
@@ -616,5 +638,6 @@ pub static PAGES: &[Page] = &[
         kind: Kind::MoreSettings,
         keywords: &["kde", "kcm", "advanced", "system settings"],
         items: &[],
+        related: &[],
     },
 ];
