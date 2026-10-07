@@ -353,12 +353,13 @@ SettingsPage {
             onClicked: page.updates.restartNow()
         }
         SecondaryButton {
+            id: tonightButton
             text: qsTr("Restart Tonight")
             visible: page.restartReady && !page.working && page.updates.scheduledAt === 0 && page.tonight > 0
             enabled: !page.installingFirmware
             TelamonToolTip {
                 text: qsTr("Restarts at %1. You get a notification 5 minutes before.").arg(new Date(page.tonight * 1000).toLocaleTimeString(Qt.locale(), Qt.locale().timeFormat(1)))
-                shown: parent.hovered || parent.visualFocus
+                shown: tonightButton.hovered || tonightButton.visualFocus
             }
             onClicked: {
                 var at = page.tonightAt(Date.now());

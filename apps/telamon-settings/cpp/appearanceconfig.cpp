@@ -27,8 +27,8 @@ namespace
 constexpr auto VioletLight = "#6858e2";
 constexpr auto VioletDark = "#8a7af4";
 
-constexpr auto HighContrastLight = "AtlasOSHighContrastLight";
-constexpr auto HighContrastDark = "AtlasOSHighContrastDark";
+constexpr auto HighContrastLight = "TelamonHighContrastLight";
+constexpr auto HighContrastDark = "TelamonHighContrastDark";
 
 // A name a tool is given as a program argument: plain characters only, no
 // quote (plasma-apply-wallpaperimage builds a script around the name).
@@ -59,7 +59,28 @@ QString atlasIcons(bool dark)
 }
 QString atlasDecoration(bool dark)
 {
-    return dark ? u"__aurorae__svg__AtlasOS-Dark"_s : u"__aurorae__svg__AtlasOS-Light"_s;
+    return dark ? u"__aurorae__svg__Telamon-Dark"_s : u"__aurorae__svg__Telamon-Light"_s;
+}
+
+// Telamon OS's own decorations, under their AtlasOS-era names too (the image
+// keeps those as aliases for one release).
+bool ourDecoration(const QString &theme)
+{
+    return theme == atlasDecoration(true) || theme == atlasDecoration(false) || theme == u"__aurorae__svg__AtlasOS-Dark"_s
+        || theme == u"__aurorae__svg__AtlasOS-Light"_s;
+}
+
+// The scheme's current name: an AtlasOS-era name of Telamon OS's own schemes
+// becomes the Telamon one, so applying it moves the user to the new name.
+QString currentSchemeName(const QString &scheme)
+{
+    if (scheme == u"AtlasOSLight"_s) {
+        return u"TelamonLight"_s;
+    }
+    if (scheme == u"AtlasOSDark"_s) {
+        return u"TelamonDark"_s;
+    }
+    return scheme;
 }
 
 // ElectricBorder values of KWin's enum.
@@ -252,7 +273,7 @@ QVariantMap AppearanceConfig::read() const
 {
     const QString scheme = currentScheme();
     const bool dark = scheme.contains(u"Dark"_s);
-    const bool highContrast = scheme.startsWith(u"AtlasOSHighContrast"_s);
+    const bool highContrast = scheme.startsWith(u"TelamonHighContrast"_s) || scheme.startsWith(u"AtlasOSHighContrast"_s);
     KConfig config = kdeutil::user(u"kdeglobals"_s);
     const bool fromWallpaper = KConfigGroup(&config, u"General"_s).readEntry("accentColorFromWallpaper", false);
     const QString accent = accentHex();
@@ -318,7 +339,7 @@ void AppearanceConfig::switchThemeParts(bool dark)
         globals.sync();
     }
     const QString decoration = kdeutil::layered(u"kwinrc"_s, u"org.kde.kdecoration2"_s, u"theme"_s);
-    if ((decoration == atlasDecoration(true) || decoration == atlasDecoration(false)) && decoration != atlasDecoration(dark)) {
+    if (ourDecoration(decoration) && decoration != atlasDecoration(dark)) {
         KConfig kwin = kdeutil::user(u"kwinrc"_s);
         KConfigGroup g(&kwin, u"org.kde.kdecoration2"_s);
         g.writeEntry("library", u"org.kde.kwin.aurorae"_s, kdeutil::Notify);
@@ -331,7 +352,7 @@ void AppearanceConfig::switchThemeParts(bool dark)
 bool AppearanceConfig::ensureHighContrastScheme(bool dark)
 {
     const QString id = QLatin1String(dark ? HighContrastDark : HighContrastLight);
-    const QString base = dark ? u"AtlasOSDark"_s : u"AtlasOSLight"_s;
+    const QString base = dark ? u"TelamonDark"_s : u"TelamonLight"_s;
     const QString source = QStandardPaths::locate(QStandardPaths::GenericDataLocation, u"color-schemes/"_s + base + u".colors"_s);
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + u"/color-schemes"_s;
     if (source.isEmpty() || !QDir().mkpath(dir)) {
@@ -356,7 +377,7 @@ void AppearanceConfig::setDark(bool dark)
         // The default accent is the violet of the scheme about to be applied.
         accent = now.value(u"accentIsDefault"_s).toBool() ? QLatin1String(dark ? VioletDark : VioletLight) : now.value(u"accent"_s).toString();
     }
-    QString scheme = dark ? u"AtlasOSDark"_s : u"AtlasOSLight"_s;
+    QString scheme = dark ? u"TelamonDark"_s : u"TelamonLight"_s;
     if (hc) {
         if (!ensureHighContrastScheme(dark)) {
             Q_EMIT failed(tr("Settings couldn't make the high contrast colors."));
@@ -380,7 +401,7 @@ void AppearanceConfig::setHighContrast(bool on)
         applyScheme(QLatin1String(dark ? HighContrastDark : HighContrastLight), QString());
     } else {
         const bool custom = !now.value(u"accentIsDefault"_s).toBool() && !now.value(u"accentFromWallpaper"_s).toBool();
-        applyScheme(dark ? u"AtlasOSDark"_s : u"AtlasOSLight"_s, custom ? now.value(u"accent"_s).toString() : QLatin1String(dark ? VioletDark : VioletLight));
+        applyScheme(dark ? u"TelamonDark"_s : u"TelamonLight"_s, custom ? now.value(u"accent"_s).toString() : QLatin1String(dark ? VioletDark : VioletLight));
     }
 }
 
@@ -403,7 +424,7 @@ void AppearanceConfig::setAccent(const QString &hex)
         }
         config.sync();
     }
-    applyScheme(now.value(u"scheme"_s).toString(), hex.isEmpty() ? QLatin1String(dark ? VioletDark : VioletLight) : hex.toLower());
+    applyScheme(currentSchemeName(now.value(u"scheme"_s).toString()), hex.isEmpty() ? QLatin1String(dark ? VioletDark : VioletLight) : hex.toLower());
 }
 
 void AppearanceConfig::setAccentFromWallpaper()
@@ -526,7 +547,7 @@ void AppearanceConfig::refreshShell()
         "var out = {dock: null, bar: null};"
         "var all = panels();"
         "var docks = all.filter(function (p) {"
-        "  return p.widgets('org.kde.plasma.icontasks').length > 0 && p.widgets('org.atlasos.dockseparator').length > 0;"
+        "  return p.widgets('org.kde.plasma.icontasks').length > 0 && (p.widgets('org.telamon.dockseparator').length + p.widgets('org.atlasos.dockseparator').length) > 0;"
         "});"
         "if (docks.length > 0) { out.dock = {location: docks[0].location, hiding: docks[0].hiding, height: docks[0].height}; }"
         "var bar = all.filter(function (p) { return p.location == 'top' && p.floating && p.lengthMode == 'fit'; });"
@@ -597,7 +618,7 @@ void AppearanceConfig::refreshShell()
 void AppearanceConfig::setDockAutoHide(bool hide)
 {
     runShellScript(u"panels().forEach(function (p) {"
-                   "  if (p.widgets('org.kde.plasma.icontasks').length > 0 && p.widgets('org.atlasos.dockseparator').length > 0) { p.hiding = '"_s
+                   "  if (p.widgets('org.kde.plasma.icontasks').length > 0 && (p.widgets('org.telamon.dockseparator').length + p.widgets('org.atlasos.dockseparator').length) > 0) { p.hiding = '"_s
                    + (hide ? u"autohide"_s : u"none"_s) + u"'; }});"_s);
 }
 
@@ -605,7 +626,7 @@ void AppearanceConfig::setDockSize(int pixels)
 {
     const int px = std::clamp(pixels, 40, 96);
     runShellScript(u"panels().forEach(function (p) {"
-                   "  if (p.widgets('org.kde.plasma.icontasks').length > 0 && p.widgets('org.atlasos.dockseparator').length > 0) { p.height = "_s
+                   "  if (p.widgets('org.kde.plasma.icontasks').length > 0 && (p.widgets('org.telamon.dockseparator').length + p.widgets('org.atlasos.dockseparator').length) > 0) { p.height = "_s
                    + QString::number(px) + u"; }});"_s);
 }
 
@@ -615,7 +636,7 @@ void AppearanceConfig::setDockPosition(const QString &location)
         return;
     }
     runShellScript(u"panels().forEach(function (p) {"
-                   "  if (p.widgets('org.kde.plasma.icontasks').length > 0 && p.widgets('org.atlasos.dockseparator').length > 0) { p.location = '"_s
+                   "  if (p.widgets('org.kde.plasma.icontasks').length > 0 && (p.widgets('org.telamon.dockseparator').length + p.widgets('org.atlasos.dockseparator').length) > 0) { p.location = '"_s
                    + location + u"'; }});"_s);
 }
 

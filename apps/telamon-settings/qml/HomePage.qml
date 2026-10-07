@@ -15,8 +15,8 @@ SettingsPage {
 
     // The Telamon OS schemes (the image's /usr/share/color-schemes); Light or
     // Dark switches between them, as the Appearance page does.
-    readonly property string lightScheme: "AtlasOSLight"
-    readonly property string darkScheme: "AtlasOSDark"
+    readonly property string lightScheme: "TelamonLight"
+    readonly property string darkScheme: "TelamonDark"
 
     // src/system_info.rs, src/network.rs, src/bluetooth.rs and
     // cpp/colorscheme.h; they go with the page.

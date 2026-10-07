@@ -86,6 +86,8 @@ private Q_SLOTS:
         const QString scheme = QStringLiteral("[General]\nColorScheme=%1\nName=AtlasOS %2\n[Colors:Window]\nBackgroundNormal=1,2,3\nForegroundNormal=4,5,6\n[Colors:Selection]\nBackgroundNormal=7,8,9\n[WM]\nactiveBackground=1,1,1\n");
         write(dir("sys") + u"/color-schemes/AtlasOSDark.colors"_s, scheme.arg(u"AtlasOSDark"_s, u"Dark"_s).toUtf8());
         write(dir("sys") + u"/color-schemes/AtlasOSLight.colors"_s, scheme.arg(u"AtlasOSLight"_s, u"Light"_s).toUtf8());
+        write(dir("sys") + u"/color-schemes/TelamonDark.colors"_s, scheme.arg(u"TelamonDark"_s, u"Dark"_s).toUtf8());
+        write(dir("sys") + u"/color-schemes/TelamonLight.colors"_s, scheme.arg(u"TelamonLight"_s, u"Light"_s).toUtf8());
         write(dir("etc") + u"/kdeglobals"_s, "[General]\nColorScheme=AtlasOSLight\n[Icons]\nTheme=Papirus\n");
         write(dir("etc") + u"/kwinrc"_s, "[org.kde.kdecoration2]\nlibrary=org.kde.kwin.aurorae\ntheme=__aurorae__svg__AtlasOS-Light\n");
         // XDG_DATA_DIRS holds the system's data, the user's is $XDG_DATA_HOME.
@@ -122,9 +124,9 @@ private Q_SLOTS:
         QCOMPARE(run.size(), 1);
         // plasma-apply-colorscheme sets the scheme (and with it the default
         // accent of the scheme).
-        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#8a7af4"_s, u"AtlasOSDark"_s}));
+        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#8a7af4"_s, u"TelamonDark"_s}));
         QCOMPARE(value(u"kdeglobals"_s, u"Icons"_s, u"Theme"_s).toString(), u"Papirus-Dark"_s);
-        QCOMPARE(value(u"kwinrc"_s, u"org.kde.kdecoration2"_s, u"theme"_s).toString(), u"__aurorae__svg__AtlasOS-Dark"_s);
+        QCOMPARE(value(u"kwinrc"_s, u"org.kde.kdecoration2"_s, u"theme"_s).toString(), u"__aurorae__svg__Telamon-Dark"_s);
         // The library is the system's already: KConfig leaves a value equal to
         // the default out of the user's file, and the session reads both.
         KConfig kwin(u"kwinrc"_s, KConfig::NoGlobals);
@@ -146,7 +148,7 @@ private Q_SLOTS:
         AppearanceConfig cfg;
         QSignalSpy run(&cfg, &AppearanceConfig::run);
         cfg.setAccent(u"#E5487A"_s);
-        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#e5487a"_s, u"AtlasOSLight"_s}));
+        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#e5487a"_s, u"TelamonLight"_s}));
         QCOMPARE(value(u"kdeglobals"_s, u"General"_s, u"accentColorFromWallpaper"_s).toString(), u"false"_s);
         // Not a colour: nothing happens.
         cfg.setAccent(u"red; rm -rf"_s);
@@ -175,25 +177,25 @@ private Q_SLOTS:
         QSignalSpy run(&cfg, &AppearanceConfig::run);
         write(dir("config") + u"/kdeglobals"_s, "[General]\nColorScheme=AtlasOSDark\n");
         cfg.setHighContrast(true);
-        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"AtlasOSHighContrastDark"_s}));
-        const QString file = dir("data") + u"/color-schemes/AtlasOSHighContrastDark.colors"_s;
+        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"TelamonHighContrastDark"_s}));
+        const QString file = dir("data") + u"/color-schemes/TelamonHighContrastDark.colors"_s;
         QVERIFY(QFile::exists(file));
         KConfig scheme(file, KConfig::SimpleConfig);
         QCOMPARE(KConfigGroup(&scheme, u"Colors:Window"_s).readEntry("BackgroundNormal", QString()), u"0,0,0"_s);
         QCOMPARE(KConfigGroup(&scheme, u"Colors:Window"_s).readEntry("ForegroundNormal", QString()), u"255,255,255"_s);
-        QCOMPARE(KConfigGroup(&scheme, u"General"_s).readEntry("ColorScheme", QString()), u"AtlasOSHighContrastDark"_s);
+        QCOMPARE(KConfigGroup(&scheme, u"General"_s).readEntry("ColorScheme", QString()), u"TelamonHighContrastDark"_s);
         // Dark by name, for kvantum-sync.
-        QVERIFY(QStringLiteral("AtlasOSHighContrastDark").contains(u"Dark"_s));
-        // On: read back, and a Light/Dark switch keeps it.
+        QVERIFY(QStringLiteral("TelamonHighContrastDark").contains(u"Dark"_s));
+        // On: read back (an AtlasOS-era name too), and a Light/Dark switch keeps it.
         write(dir("config") + u"/kdeglobals"_s, "[General]\nColorScheme=AtlasOSHighContrastDark\n");
         QVERIFY(cfg.read().value(u"highContrast"_s).toBool());
         QVERIFY(cfg.read().value(u"dark"_s).toBool());
         cfg.setDark(false);
-        QCOMPARE(run.last().at(0).toStringList().last(), u"AtlasOSHighContrastLight"_s);
-        QVERIFY(QFile::exists(dir("data") + u"/color-schemes/AtlasOSHighContrastLight.colors"_s));
+        QCOMPARE(run.last().at(0).toStringList().last(), u"TelamonHighContrastLight"_s);
+        QVERIFY(QFile::exists(dir("data") + u"/color-schemes/TelamonHighContrastLight.colors"_s));
         // Off: back to the usual scheme.
         cfg.setHighContrast(false);
-        QCOMPARE(run.last().at(0).toStringList().last(), u"AtlasOSDark"_s);
+        QCOMPARE(run.last().at(0).toStringList().last(), u"TelamonDark"_s);
     }
 
     void wallpapersOnlyKnownOnes()

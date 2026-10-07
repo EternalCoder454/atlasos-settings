@@ -14,7 +14,7 @@ class ColorSchemeConfig : public QObject
 public:
     using QObject::QObject;
 
-    // The scheme's name ("AtlasOSLight"), or "" when none is set or the
+    // The scheme's name ("TelamonLight"), or "" when none is set or the
     // name isn't one this passes to a program.
     Q_INVOKABLE QString current() const;
 
