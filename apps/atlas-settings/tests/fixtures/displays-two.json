@@ -1,0 +1,216 @@
+{
+  "screen": {
+    "id": 1,
+    "maxSize": {
+      "width": 16384,
+      "height": 16384
+    },
+    "minSize": {
+      "width": 8,
+      "height": 8
+    },
+    "currentSize": {
+      "width": 3340,
+      "height": 1920
+    },
+    "maxActiveOutputsCount": 4
+  },
+  "outputs": [
+    {
+      "id": 1,
+      "name": "DP-1",
+      "vendor": "Dell",
+      "model": "U2723QE",
+      "type": "DisplayPort",
+      "modes": [
+        {
+          "id": "1",
+          "name": "3840x2160@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 3840,
+            "height": 2160
+          }
+        },
+        {
+          "id": "2",
+          "name": "3840x2160@59.94",
+          "refreshRate": 59.94,
+          "size": {
+            "width": 3840,
+            "height": 2160
+          }
+        },
+        {
+          "id": "3",
+          "name": "3840x2160@30.0",
+          "refreshRate": 30.0,
+          "size": {
+            "width": 3840,
+            "height": 2160
+          }
+        },
+        {
+          "id": "4",
+          "name": "2560x1440@144.0",
+          "refreshRate": 144.0,
+          "size": {
+            "width": 2560,
+            "height": 1440
+          }
+        },
+        {
+          "id": "5",
+          "name": "2560x1440@120.0",
+          "refreshRate": 120.0,
+          "size": {
+            "width": 2560,
+            "height": 1440
+          }
+        },
+        {
+          "id": "6",
+          "name": "2560x1440@59.95",
+          "refreshRate": 59.95,
+          "size": {
+            "width": 2560,
+            "height": 1440
+          }
+        },
+        {
+          "id": "7",
+          "name": "1920x1080@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 1920,
+            "height": 1080
+          }
+        },
+        {
+          "id": "8",
+          "name": "1600x900@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 1600,
+            "height": 900
+          }
+        },
+        {
+          "id": "9",
+          "name": "1280x720@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 1280,
+            "height": 720
+          }
+        }
+      ],
+      "preferredModes": [
+        "1"
+      ],
+      "currentModeId": "1",
+      "pos": {
+        "x": 0,
+        "y": 0
+      },
+      "size": {
+        "width": 3840,
+        "height": 2160
+      },
+      "scale": 1.7,
+      "rotation": 1,
+      "connected": true,
+      "enabled": true,
+      "priority": 1
+    },
+    {
+      "id": 2,
+      "name": "HDMI-A-1",
+      "vendor": "Acer",
+      "model": "KA242Y",
+      "type": "HDMI",
+      "modes": [
+        {
+          "id": "1",
+          "name": "1920x1080@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 1920,
+            "height": 1080
+          }
+        },
+        {
+          "id": "2",
+          "name": "1920x1080@75.0",
+          "refreshRate": 75.0,
+          "size": {
+            "width": 1920,
+            "height": 1080
+          }
+        },
+        {
+          "id": "3",
+          "name": "1920x1080@50.0",
+          "refreshRate": 50.0,
+          "size": {
+            "width": 1920,
+            "height": 1080
+          }
+        },
+        {
+          "id": "4",
+          "name": "1680x1050@59.95",
+          "refreshRate": 59.95,
+          "size": {
+            "width": 1680,
+            "height": 1050
+          }
+        },
+        {
+          "id": "5",
+          "name": "1280x1024@60.02",
+          "refreshRate": 60.02,
+          "size": {
+            "width": 1280,
+            "height": 1024
+          }
+        },
+        {
+          "id": "6",
+          "name": "1280x720@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 1280,
+            "height": 720
+          }
+        },
+        {
+          "id": "7",
+          "name": "1024x768@60.0",
+          "refreshRate": 60.0,
+          "size": {
+            "width": 1024,
+            "height": 768
+          }
+        }
+      ],
+      "preferredModes": [
+        "1"
+      ],
+      "currentModeId": "1",
+      "pos": {
+        "x": 2259,
+        "y": 0
+      },
+      "size": {
+        "width": 1920,
+        "height": 1080
+      },
+      "scale": 1.0,
+      "rotation": 2,
+      "connected": true,
+      "enabled": true,
+      "priority": 2
+    }
+  ]
+}

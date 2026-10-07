@@ -11,5 +11,7 @@ fn main() {
         .file("src/users_page.rs")
         .file("src/privacy_page.rs")
         .file("src/system_info.rs")
+        .file("src/network.rs")
+        .file("src/bluetooth.rs")
         .build();
 }

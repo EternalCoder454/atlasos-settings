@@ -11,6 +11,7 @@
 //! on a private bus (`tests/common`), never the machine's own services.
 
 pub mod accounts;
+pub mod bluetooth;
 pub mod bus;
 pub mod error;
 pub mod firewall;
@@ -18,6 +19,7 @@ pub mod flatpak;
 pub mod fprint;
 pub mod hostname;
 pub mod locale;
+pub mod network;
 pub mod portal;
 pub mod power;
 pub mod sysinfo;

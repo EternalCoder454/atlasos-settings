@@ -1,10 +1,14 @@
 #include "pagebackends.h"
 
 #include "autostartconfig.h"
+#include "colorscheme.h"
 #include "defaultapps.h"
 #include "localeconfig.h"
+#include "nightlight.h"
 #include "powerconfig.h"
+#include "screenconfig.h"
 #include "screenlockconfig.h"
+#include "soundmixer.h"
 
 #include <QDebug>
 #include <QQmlEngine>
@@ -17,6 +21,14 @@ QObject *PageBackends::create(const QString &kind, QObject *parent)
     QObject *object = nullptr;
     if (kind == QLatin1String("locale-config")) {
         object = new LocaleConfig;
+    } else if (kind == QLatin1String("displays")) {
+        object = new ScreenConfig;
+    } else if (kind == QLatin1String("night-light")) {
+        object = new NightLight;
+    } else if (kind == QLatin1String("sound")) {
+        object = new SoundMixer;
+    } else if (kind == QLatin1String("color-scheme")) {
+        object = new ColorSchemeConfig;
     } else if (kind == QLatin1String("power-config")) {
         object = new PowerConfig;
     } else if (kind == QLatin1String("screenlock-config")) {

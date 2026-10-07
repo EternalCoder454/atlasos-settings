@@ -46,6 +46,10 @@ BuildRequires:  cmake(KF6WindowSystem)
 BuildRequires:  cmake(KF6KIO)
 BuildRequires:  cmake(KF6GuiAddons)
 BuildRequires:  cmake(KF6Config)
+# Displays: the screens, through libkscreen (Plasma's); Sound: PulseAudio's
+# API on PipeWire, through PulseAudioQt (Plasma's).
+BuildRequires:  cmake(KF6Screen)
+BuildRequires:  cmake(KF6PulseAudioQt)
 BuildRequires:  cmake(KF6Service)
 # crypt(3), for the password hash AccountsService takes
 BuildRequires:  libxcrypt-devel
@@ -56,6 +60,11 @@ BuildRequires:  kf6-kirigami-devel
 BuildRequires:  atlas-ui >= 1.4.0
 
 Requires:       kf6-kirigami
+# Displays reads and sets the screens through libkscreen's backend for the
+# running session; Sound talks to PipeWire's PulseAudio server.
+Requires:       libkscreen
+Requires:       pulseaudio-qt-qt6
+Requires:       pipewire-pulseaudio
 # Atlas.Ui, the shared look (atlas-framework); 1.4.0 for AtlasSidebar and
 # AtlasSearchResults
 Requires:       atlas-ui >= 1.4.0
@@ -125,6 +134,9 @@ for path in "%{_builddir}" %{?_atlas_build_cache:"%{_atlas_build_cache}"}; do
         exit 1
     fi
 done
+# The C++ logic's tests (screens through libkscreen's Fake backend, Night
+# Light in a throwaway kwinrc; the sound test needs a sound server and skips).
+QT_QPA_PLATFORM=offscreen %ctest
 desktop-file-validate %{buildroot}%{_datadir}/applications/net.eterneon.atlas.settings.desktop
 appstream-util validate-relax --nonet \
     %{buildroot}%{_datadir}/metainfo/net.eterneon.atlas.settings.metainfo.xml

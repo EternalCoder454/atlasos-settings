@@ -23,6 +23,9 @@ find_package(KF6KIO REQUIRED)
 find_package(KF6GuiAddons REQUIRED)
 # Plasma's language and formats (plasma-localerc), written as its KCM does.
 find_package(KF6Config REQUIRED)
+# Displays: the screens through libkscreen, as Plasma's Display Configuration
+# reads and sets them; Night Light writes kwinrc through KConfig.
+find_package(KF6Screen REQUIRED)
 # The installed apps (default apps, startup apps): KApplicationTrader.
 find_package(KF6Service REQUIRED)
 find_package(Corrosion REQUIRED)
@@ -75,6 +78,7 @@ qt_add_executable(atlas-settings-app
     cpp/launcher.cpp
     cpp/kcmcatalog.cpp
     cpp/localeconfig.cpp
+    cpp/colorscheme.cpp
     cpp/powerconfig.cpp
     cpp/screenlockconfig.cpp
     cpp/autostartconfig.cpp
@@ -100,6 +104,12 @@ qt_add_qml_module(atlas-settings-app
         qml/TimeLanguagePage.qml
         qml/PickerSheet.qml
         qml/SystemPage.qml
+        qml/DisplaysPage.qml
+        qml/ArrangementView.qml
+        qml/SoundPage.qml
+        qml/NetworkPage.qml
+        qml/DevicesPage.qml
+        qml/HomePage.qml
         qml/PowerPage.qml
         qml/UsersPage.qml
         qml/PrivacyPage.qml
@@ -113,6 +123,46 @@ target_link_libraries(atlas-settings-app PRIVATE
     KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore KF6::Service
     # crypt(3), for the password hash AccountsService takes (settings-sys).
     crypt)
+
+# Displays' C++: the screens (libkscreen) and Night Light (kwinrc). A library
+# of its own so the tests link what the app links.
+find_package(Qt6 6.11 REQUIRED COMPONENTS DBus Test)
+add_library(atlas-settings-text STATIC cpp/safetext.cpp)
+target_include_directories(atlas-settings-text PUBLIC cpp)
+target_link_libraries(atlas-settings-text PUBLIC Qt6::Core)
+add_library(atlas-settings-displays STATIC
+    cpp/displaylogic.cpp
+    cpp/reverttimer.cpp
+    cpp/screenconfig.cpp
+    cpp/nightlight.cpp)
+target_include_directories(atlas-settings-displays PUBLIC cpp)
+target_link_libraries(atlas-settings-displays PUBLIC atlas-settings-text Qt6::Core Qt6::Gui Qt6::DBus KF6::ConfigCore KF6::Screen)
+# ATLAS_SETTINGS_FAKE_DISPLAYS=<json>: libkscreen's Fake backend instead of the
+# compositor, for the tests and the screenshots. It needs a private header of
+# libkscreen (backendmanager_p.h), so a libkscreen that drops it builds with
+# -DATLAS_SETTINGS_TEST_HOOKS=OFF.
+option(ATLAS_SETTINGS_TEST_HOOKS "Build the fake-screens hook for tests" ON)
+if(ATLAS_SETTINGS_TEST_HOOKS)
+    target_compile_definitions(atlas-settings-displays PUBLIC ATLAS_SETTINGS_TEST_HOOKS)
+endif()
+target_link_libraries(atlas-settings-app PRIVATE atlas-settings-displays)
+
+# Sound's C++: PulseAudio's API on PipeWire, through PulseAudioQt (Plasma's own
+# library for it).
+find_package(KF6PulseAudioQt REQUIRED)
+add_library(atlas-settings-sound STATIC
+    cpp/soundlogic.cpp
+    cpp/soundmixer.cpp)
+target_include_directories(atlas-settings-sound PUBLIC cpp)
+target_link_libraries(atlas-settings-sound PUBLIC atlas-settings-text Qt6::Core Qt6::Gui KF6::PulseAudioQt)
+target_link_libraries(atlas-settings-app PRIVATE atlas-settings-sound)
+
+# The C++ logic's tests (Qt Test, offscreen): `ctest --test-dir <build>`.
+option(ATLAS_SETTINGS_TESTS "Build the C++ tests" ON)
+if(ATLAS_SETTINGS_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 install(TARGETS atlas-settings-app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES data/net.eterneon.atlas.settings.desktop

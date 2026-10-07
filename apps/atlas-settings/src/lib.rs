@@ -4,8 +4,11 @@
 
 mod apps_page;
 mod backend;
+mod bluetooth;
+mod network;
 mod power_page;
 mod privacy_page;
+mod support;
 mod system_info;
 mod time_language;
 mod users_page;
@@ -58,6 +61,12 @@ pub unsafe extern "C" fn atlas_page_backend_new(kind: *const c_char) -> *mut c_v
             .into_raw()
             .cast(),
         b"system" => system_info::qobject::system_info_make_unique()
+            .into_raw()
+            .cast(),
+        b"network" => network::qobject::network_page_make_unique()
+            .into_raw()
+            .cast(),
+        b"bluetooth" => bluetooth::qobject::bluetooth_page_make_unique()
             .into_raw()
             .cast(),
         _ => std::ptr::null_mut(),
