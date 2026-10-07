@@ -69,10 +69,24 @@ takes over `systemsettings` (see "Entry points").
 - `crates/settings-sys`: no Qt. zbus 5 clients for the system's services,
   one module per service, with timeouts and plain-language errors
   (`error.rs`). Tested against python-dbusmock on a private bus.
-- `apps/atlas-settings`: the CXX-Qt backend (`src/backend.rs`), `cpp/main.cpp`
-  (Qt start, single instance, command line), `cpp/launcher.cpp` (starts
-  `kcmshell6` and Atlas Updater), `cpp/kcmcatalog.cpp` (the installed KCMs,
-  through KPluginMetaData) and `qml/`.
+- `apps/atlas-settings`: the CXX-Qt backend (`src/backend.rs`), one
+  backend QObject per built page (`src/time_language.rs`,
+  `src/system_info.rs`) and the worker-thread helper (`src/worker.rs`),
+  `cpp/main.cpp` (Qt start, single instance, command line),
+  `cpp/launcher.cpp` (starts `kcmshell6` and Atlas Updater),
+  `cpp/kcmcatalog.cpp` (the installed KCMs, through KPluginMetaData),
+  `cpp/pagebackends.cpp` (makes a page's backends when it is shown),
+  `cpp/localeconfig.cpp` (Plasma's `plasma-localerc`, through KConfig) and
+  `qml/`.
+- The page kit in `qml/`: `SettingsPage` (an `AtlasPage` with the page's
+  registry entry; scrolls to and briefly highlights the row a link or
+  search asked for, found by its `objectName` = the item ID, and opens
+  Advanced first when the item is folded), `AdvancedSection` (the closed
+  Advanced `Section`, which adds a `KcmRow` for each folded KCM item of the
+  registry), `KcmRow` (says it opens Plasma's settings), `RelatedLinks`
+  (the registry's `related` pages) and `PickerSheet` (a searchable list in
+  a sheet). `Main.qml` maps page IDs to their components (`nativePages`);
+  any other page shows `PendingPage`.
 - Later: Displays (libkscreen) and the PipeWire side of Sound (libpulse) in
   C++, because their only stable API is C++/C; decided by spikes S1 and S2.
 
@@ -87,9 +101,10 @@ the page beside it.
   field has text, an `AtlasSearchResults` list replaces the page, with Up,
   Down and Enter handled from the field. Results are pages and single
   settings, ranked in Rust (`settings_registry::search`), at most 50.
-- **Pages:** a native page is an `AtlasPage` of `Section`s and
-  `SectionRow`s, its folded settings in a closed Advanced `Section` at the
-  end. Until a page is built it shows "Coming Soon" with a button that opens
+- **Pages:** a native page is a `SettingsPage` of `Section`s and
+  `SectionRow`s, its folded settings in a closed `AdvancedSection` at the
+  end, then its `RelatedLinks`. A sidebar click or link to the page shown
+  makes the page anew, so it opens at its top with Advanced closed. Until a page is built it shows "Coming Soon" with a button that opens
   the KCM it replaces. Every change applies at once; there is no Apply
   button.
 - The last page shown is kept in `atlas-settingsrc` (`[Window] Page`); a new
@@ -99,8 +114,33 @@ the page beside it.
 
 The GUI thread never blocks on D-Bus or a child process. System calls run on
 worker threads with a 10 s timeout (120 s for calls that may show a polkit
-prompt) and post results back with `qt_thread().queue`. A page's backend and
-its watchers live only while the page is shown.
+prompt) and post results back with `qt_thread().queue` (`src/worker.rs`). A
+page's backend and its watchers live only while the page is shown: the
+page asks `PageBackends.create(kind, page)` for them, which parents them to
+the page, and a result that comes back after the page is gone is dropped.
+
+## Time & Language and System
+
+- **Time:** network time and the time zone are timedated's (`SetNTP`,
+  `SetTimezone`, the list from `ListTimezones`).
+- **The user's language and formats** are Plasma's, as Plasma 6.7's
+  Region & Language KCM keeps them and startplasma reads them at sign-in:
+  `plasma-localerc` `[Formats]` `LANG` and `LC_*`, `[Translations]`
+  `LANGUAGE`, written through KConfig (atomically). Language sets `LANG`
+  and `LANGUAGE`; Formats sets every `LC_*` the KCM writes, or removes them
+  to follow the language. Plasma has no 24-hour switch of its own (the
+  clock follows `LC_TIME`), so 24-Hour Time sets `LC_TIME` to a locale of
+  the same language that writes times the asked way (`en_GB` for `en_US`),
+  or removes it when the formats already do. Changes apply at the next
+  sign-in, which the page says. Unlike the KCM, Settings doesn't yet tell
+  AccountsService (`SetLanguages`) or generate missing locales.
+- **The login screen's language** is localed's `LANG` (`SetLocale`).
+- **System:** the device name is hostnamed's pretty hostname; the static
+  hostname is derived from it (lower-case ASCII letters, digits and
+  hyphens), and kept when nothing of the name is left. The version, the
+  processor, the memory and the graphics are read from `/usr/lib/os-release`,
+  `/proc` and `/sys` and the PCI ID database, capped and made safe to show
+  (`settings_sys::sysinfo`); nothing privileged.
 
 ## Launch arguments and single instance
 

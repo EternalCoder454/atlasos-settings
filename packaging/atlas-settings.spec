@@ -45,6 +45,7 @@ BuildRequires:  cmake(KF6DBusAddons)
 BuildRequires:  cmake(KF6WindowSystem)
 BuildRequires:  cmake(KF6KIO)
 BuildRequires:  cmake(KF6GuiAddons)
+BuildRequires:  cmake(KF6Config)
 # QML modules qmlcachegen resolves at build time (not linked). atlas-ui comes
 # from atlas-framework, which is in no repository: install its RPMs first
 # (build-rpm.sh does, given ATLAS_LOCAL_RPMS).

@@ -4,6 +4,7 @@
 // (src/backend.rs), never here.
 #include "kcmcatalog.h"
 #include "launcher.h"
+#include "pagebackends.h"
 
 #include <atlas/app.h>
 
@@ -87,12 +88,14 @@ int main(int argc, char *argv[])
     std::unique_ptr<QObject> backend(static_cast<QObject *>(atlas_backend_new()));
     Launcher launcher;
     KcmCatalog kcmCatalog;
+    PageBackends pageBackends;
     auto engine = std::make_unique<QQmlApplicationEngine>();
     QObject::connect(engine.get(), &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     engine->setInitialProperties({
         {QStringLiteral("backend"), QVariant::fromValue(backend.get())},
         {QStringLiteral("launcher"), QVariant::fromValue(&launcher)},
         {QStringLiteral("kcmCatalog"), QVariant::fromValue(&kcmCatalog)},
+        {QStringLiteral("pageBackends"), QVariant::fromValue(&pageBackends)},
     });
     engine->loadFromModule("net.eterneon.atlas.settings", "Main");
     if (engine->rootObjects().isEmpty()) {
