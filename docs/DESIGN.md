@@ -76,7 +76,9 @@ takes over `systemsettings` (see "Entry points").
   `cpp/launcher.cpp` (starts `kcmshell6` and Atlas Updater),
   `cpp/kcmcatalog.cpp` (the installed KCMs, through KPluginMetaData),
   `cpp/pagebackends.cpp` (makes a page's backends when it is shown),
-  `cpp/localeconfig.cpp` (Plasma's `plasma-localerc`, through KConfig) and
+  `cpp/localeconfig.cpp` (Plasma's `plasma-localerc`, through KConfig), the
+  KConfig and KWin side of Appearance, Keyboard & Mouse, Notifications and
+  Accessibility (`cpp/appearanceconfig.cpp` and the like, see below) and
   `qml/`.
 - The page kit in `qml/`: `SettingsPage` (an `AtlasPage` with the page's
   registry entry; scrolls to and briefly highlights the row a link or
@@ -240,6 +242,79 @@ run with `ctest`).
   libkscreen header. The Sound test (`soundmixer_test`) needs a private
   PipeWire with null devices and skips without one
   (`ATLAS_TEST_SOUND=private`). Neither touches the real screens or audio.
+
+## Appearance, Keyboard & Mouse, Notifications and Accessibility
+
+These pages write Plasma's own settings the way Plasma's modules do: the same
+files, groups and keys, through KConfig with `KConfig::Notify` (so Plasma,
+KWin and apps that watch the file pick the change up live), or the same
+service call. Their backends are C++ QObjects (`cpp/appearanceconfig.*`,
+`inputconfig.*`, `notificationsconfig.*`, `accessibilityconfig.*`, helpers in
+`kdeutil.h`): KConfig has no Rust binding here, and the D-Bus calls are
+asynchronous QtDBus calls, so the GUI thread still never waits. Programs go
+to the page through a `run(argv)` signal and then through the Launcher; no
+backend starts one itself. Tests (`tests/pageconfig_test.cpp`, `ctest`) read
+every write back from a temporary `$XDG_CONFIG_HOME` and run the KWin and
+Plasma shell calls against fakes (`tests/fakes.h`) on a private session bus.
+
+- **Light or Dark** runs `plasma-apply-colorscheme AtlasOSLight|AtlasOSDark`
+  (with `--accent-color` when an accent is set), which writes `[General]
+  ColorScheme` into the user's kdeglobals and announces it: the keys
+  kvantum-sync watches, and gtkconfig, which follows for GTK. The icons
+  (`Papirus`/`Papirus-Dark`) and the Aurorae window decoration follow when
+  they are AtlasOS's own; a theme the user picked stays. The scheme shown is
+  read as kvantum-sync reads it (kdeglobals, `kdedefaults/kdeglobals`, then
+  /etc/xdg).
+- **Accent** is `plasma-apply-colorscheme --accent-color` (kdeglobals
+  `AccentColor`), or `accentColorFromWallpaper=true`, which Plasma's accent
+  service follows. Violet, the default, is the scheme's own accent.
+- **High Contrast** (Accessibility) makes `AtlasOSHighContrast{Light,Dark}`
+  from the AtlasOS scheme in `~/.local/share/color-schemes` and applies it;
+  Light or Dark then switches between the two high contrast schemes.
+  Plasma has no switch of its own. Kvantum's themes are fixed colours, so
+  Qt widgets of apps that use Kvantum keep their look; palette-based apps
+  (Atlas apps, Plasma, GTK through gtkconfig) follow.
+- **Wallpaper** is `plasma-apply-wallpaperimage <package or file>`, only
+  for what the page lists (`/usr/share/wallpapers`, `~/.local/share/
+  wallpapers` and `~/Pictures`). The current one is read from the applets
+  file, read only.
+- **Transparency** is Atlas.Ui's `Appearance.transparency` (`atlasrc`
+  `[Appearance] Transparency`), the key kvantum-sync and every Atlas app
+  watch.
+- **Dock and top bar** are Plasma panels, read and changed with Plasma's panel
+  scripting (`org.kde.PlasmaShell.evaluateScript`), as the AtlasOS menu bar
+  toggle does: the dock is the panel with the task manager and the AtlasOS
+  dock separator. Scripts are fixed text with validated values only.
+- **Virtual Desktops** are KWin's `org.kde.KWin.VirtualDesktopManager`
+  (`createDesktop`, `removeDesktop`); **Hot Corners** are kwinrc
+  `[ElectricBorders]` and `[Effect-overview] BorderActivate`;
+  **Global Theme** is `plasma-apply-lookandfeel --apply`, for the themes
+  listed.
+- **Input sources** are kxkbrc `[Layout]` (`Use`, `LayoutList`,
+  `VariantList`, `DisplayNames`) as kcm_keyboard saves them, up to four, from
+  xkeyboard-config's `evdev.xml`. **Key repeat and Num Lock** are kcminputrc
+  `[Keyboard]` (`RepeatDelay`, `RepeatRate`, `NumLock`).
+- **Pointers and touchpads** are KWin's input devices
+  (`org.kde.KWin.InputDevice`): the settings are properties KWin applies at
+  once and keeps in kcminputrc itself, as kcm_mouse and kcm_touchpad do.
+  Speed, scrolling and the primary button are set on every device that
+  supports them; tapping only on touchpads; the rows show when KWin lists a
+  pointer (a touchpad row only with a touchpad).
+- **Do Not Disturb** is plasmanotifyrc `[DoNotDisturb] Until`; **apps** are
+  `[Applications][<desktop entry>]` `ShowPopups`, `ShowInHistory` and
+  `ShowBadges`; **popups** are `[Notifications] PopupPosition`,
+  `PopupTimeout` and `ShowPopupTimeout`. Plasma 6.7 has no setting for the
+  lock screen's notifications that Settings could find, so that row opens
+  Plasma's Screen Locking module.
+- **Text Size** scales the six fonts of kdeglobals from the sizes the system
+  sets (what "Adjust All Fonts" does) and sends `refreshFonts` to the
+  platform theme. **Reduce Motion** is `[KDE] AnimationDurationFactor` = 0
+  (removed again when turned off, which brings back the system's speed).
+  **Screen Reader** is kaccessrc `[ScreenReader] Enabled` (kaccess starts
+  Orca) and the `screen-reader-enabled` GSettings key, as kcm_access sets
+  them. **Zoom** is kwinrc `[Plugins] zoomEnabled` and the effect;
+  **Sticky Keys** and the other helps are kaccessrc `[Keyboard]` and
+  `[Mouse]`.
 
 ## Launch arguments and single instance
 
