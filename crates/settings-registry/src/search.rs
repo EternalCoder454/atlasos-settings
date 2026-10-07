@@ -149,6 +149,19 @@ mod tests {
         assert_eq!(first("night light"), ("displays", Some("night-light")));
         assert_eq!(first("dark"), ("appearance", Some("style")));
         assert_eq!(first("fingerprint"), ("users", Some("fingerprint")));
+        assert_eq!(first("autologin"), ("users", Some("auto-login")));
+        // The Accounts page is still the `users` page, found by what people
+        // call it.
+        for q in [
+            "accounts",
+            "account",
+            "your info",
+            "profile",
+            "users",
+            "family",
+        ] {
+            assert_eq!(first(q).0, "users", "{q:?}");
+        }
         assert_eq!(first("timezone"), ("time-language", Some("timezone")));
         assert_eq!(first("SHORTCUTS"), ("input", Some("shortcuts")));
         assert_eq!(first("printer"), ("devices", Some("printers")));

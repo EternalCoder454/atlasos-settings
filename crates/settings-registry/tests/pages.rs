@@ -163,3 +163,54 @@ fn updates_is_a_page_of_its_own() {
     // System's links lead to it.
     assert!(pages::page("system").is_some_and(|p| p.related.contains(&"updates")));
 }
+
+/// Users is the Accounts page: you first, then Sign-In Options, then the
+/// other people. The ID stays `users` for links, and "users" stays a search
+/// word.
+#[test]
+fn accounts_page_keeps_the_users_id() {
+    let (page, item) = pages::find("users", Some("auto-login")).expect("the Accounts page");
+    assert_eq!(page.id, "users");
+    assert_eq!(page.title, "Accounts");
+    assert_eq!(
+        page.keywords,
+        [
+            "account",
+            "accounts",
+            "your info",
+            "profile",
+            "users",
+            "family",
+            "login",
+            "accountsservice",
+        ]
+    );
+    // Automatic Login is a setting of its own now, not folded away.
+    let item = item.expect("the Automatic Login setting");
+    assert_eq!(item.id, "auto-login");
+    assert!(!item.advanced);
+    let unfolded: Vec<_> = page
+        .items
+        .iter()
+        .filter(|i| !i.advanced)
+        .map(|i| i.id)
+        .collect();
+    assert_eq!(
+        unfolded,
+        [
+            "name",
+            "picture",
+            "password",
+            "fingerprint",
+            "auto-login",
+            "add-user",
+        ]
+    );
+    let folded: Vec<_> = page
+        .items
+        .iter()
+        .filter(|i| i.advanced)
+        .map(|i| i.id)
+        .collect();
+    assert_eq!(folded, ["login-screen"]);
+}

@@ -3,7 +3,7 @@
 The settings app of [Telamon OS](https://github.com/EternalCoder454/AtlasOS). It
 replaces KDE System Settings with sixteen pages instead of dozens: Home,
 Network, Bluetooth & Devices, Displays, Sound, Keyboard & Mouse, Appearance,
-Notifications, Apps, Privacy & Security, Users, Power & Battery,
+Notifications, Apps, Privacy & Security, Accounts, Power & Battery,
 Accessibility, Time & Language, System and Updates (what Telamon Updater's
 window was).
 

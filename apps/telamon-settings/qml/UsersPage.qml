@@ -6,11 +6,12 @@ import QtQuick.Dialogs
 import org.kde.kirigami as Kirigami
 import Telamon.Ui
 
-// Users: your account at the top (name, picture, password, fingerprint),
-// the other people on this computer and Add User, all through
+// Accounts (the `users` page): your account first, as a header with your
+// picture and name, then how you sign in (password, fingerprint, automatic
+// login), then the other people on this computer and Add User, all through
 // AccountsService; fingerprints through fprintd. Passwords go straight to
 // the service and are cleared from the fields as soon as the sheet closes.
-// Under Advanced: Automatic Login and the login screen's settings.
+// Under Advanced: the login screen's settings.
 SettingsPage {
     id: page
 
@@ -63,38 +64,143 @@ SettingsPage {
         shown: text !== ""
     }
 
-    Section {
+    // You, big: your picture and name, and what to change about them. The
+    // picture and the name are found by their IDs, as rows are.
+    RowLayout {
         Layout.fillWidth: true
+        Layout.topMargin: Kirigami.Units.smallSpacing
+        Layout.bottomMargin: Kirigami.Units.smallSpacing
+        Layout.leftMargin: TelamonStyle.spacingLarge
+        spacing: TelamonStyle.spacingLarge * 1.5
 
-        SectionRow {
-            objectName: "name"
-            title: qsTr("Full Name")
-            subtitle: page.sys && page.sys.meName !== "" ? qsTr("%1 · %2").arg(page.sys.meName).arg(page.accountType(page.sys.meAdmin)) : ""
-            value: page.sys ? page.sys.meRealName : ""
-            chevron: true
-            busy: page.sys !== null && page.sys.busy
+        Item {
+            id: pictureButton
+            objectName: "picture"
+            readonly property real size: Kirigami.Units.gridUnit * 5.5
+            readonly property bool lit: hover.hovered || pictureButton.activeFocus
+            Layout.preferredWidth: size
+            Layout.preferredHeight: size
+            Layout.alignment: Qt.AlignVCenter
             enabled: page.sys !== null && page.sys.available
-            leading: TelamonAvatar {
+            activeFocusOnTab: true
+            Accessible.role: Accessible.Button
+            Accessible.name: qsTr("Change Picture")
+            Accessible.focusable: true
+            Accessible.onPressAction: pictureDialog.open()
+            Keys.onSpacePressed: pictureDialog.open()
+            Keys.onReturnPressed: pictureDialog.open()
+
+            TelamonAvatar {
+                anchors.fill: parent
+                size: pictureButton.size
                 name: page.sys ? page.sys.meRealName : ""
                 source: page.sys ? page.pictureUrl(page.sys.mePicture) : ""
-                size: Kirigami.Units.gridUnit * 2.2
+                Accessible.ignored: true
             }
-            onClicked: nameSheet.open()
+            // Darkens the picture under the pointer or the keyboard focus.
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: Qt.alpha("black", 0.35) // telamon-lint: allow-raw (a scrim over a photo is dark in both themes)
+                opacity: pictureButton.lit ? 1 : 0
+                Behavior on opacity {
+                    enabled: !TelamonStyle.reducedMotion
+                    NumberAnimation {
+                        duration: TelamonStyle.durationShort
+                    }
+                }
+            }
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: -2
+                radius: width / 2
+                color: "transparent"
+                border.width: 2
+                border.color: TelamonStyle.focus
+                visible: pictureButton.activeFocus
+            }
+            // The camera: this picture can be changed.
+            Rectangle {
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                width: Kirigami.Units.gridUnit * 1.8
+                height: width
+                radius: width / 2
+                color: TelamonStyle.surfaceRaised
+                border.width: 1
+                border.color: TelamonStyle.controlBorder
+
+                Symbol {
+                    anchors.centerIn: parent
+                    icon: Symbols.PhotoCamera
+                    size: parent.width * 0.55
+                }
+            }
+            HoverHandler {
+                id: hover
+                cursorShape: Qt.PointingHandCursor
+            }
+            TapHandler {
+                onTapped: pictureDialog.open()
+            }
         }
-        SectionRow {
-            objectName: "picture"
-            title: qsTr("Profile Picture")
-            subtitle: qsTr("Choose a picture from your files")
-            chevron: true
-            enabled: page.sys !== null && page.sys.available
-            onClicked: pictureDialog.open()
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignVCenter
+            spacing: Kirigami.Units.largeSpacing
+
+            ColumnLayout {
+                objectName: "name"
+                Layout.fillWidth: true
+                spacing: 0
+
+                TelamonLabel {
+                    Layout.fillWidth: true
+                    textStyle: TelamonLabel.Title
+                    text: page.sys && page.sys.meRealName !== "" ? page.sys.meRealName : (page.sys && page.sys.meName !== "" ? page.sys.meName : qsTr("Your Account"))
+                    elide: Text.ElideRight
+                    textFormat: Text.PlainText
+                    Accessible.role: Accessible.Heading
+                }
+                TelamonLabel {
+                    Layout.fillWidth: true
+                    visible: text !== ""
+                    text: page.sys && page.sys.meName !== "" ? qsTr("%1 · %2").arg(page.sys.meName).arg(page.accountType(page.sys.meAdmin)) : ""
+                    opacity: 0.65
+                    elide: Text.ElideRight
+                    textFormat: Text.PlainText
+                }
+            }
+            RowLayout {
+                spacing: Kirigami.Units.smallSpacing
+
+                SecondaryButton {
+                    text: qsTr("Change Picture")
+                    enabled: page.sys !== null && page.sys.available
+                    onClicked: pictureDialog.open()
+                }
+                SecondaryButton {
+                    text: qsTr("Edit Name")
+                    enabled: page.sys !== null && page.sys.available && !page.sys.busy
+                    onClicked: nameSheet.open()
+                }
+            }
         }
+    }
+
+    Section {
+        Layout.fillWidth: true
+        title: qsTr("Sign-In Options")
+
         SectionRow {
             objectName: "password"
             title: qsTr("Password")
             subtitle: qsTr("Change the password you sign in with")
             chevron: true
             enabled: page.sys !== null && page.sys.available
+            leading: Symbol {
+                icon: Symbols.Key
+            }
             onClicked: passwordSheet.open()
         }
         SectionRow {
@@ -107,13 +213,28 @@ SettingsPage {
                 return n === 0 ? qsTr("None Added") : n === 1 ? qsTr("1 Finger") : qsTr("%1 Fingers").arg(n);
             }
             chevron: true
+            leading: Symbol {
+                icon: Symbols.Fingerprint
+            }
             onClicked: fingerSheet.open()
+        }
+        SectionRow {
+            objectName: "auto-login"
+            title: qsTr("Automatic Login")
+            subtitle: qsTr("Sign in as %1 when the computer starts, without a password").arg(page.sys && page.sys.meName !== "" ? page.sys.meName : qsTr("you"))
+            showSwitch: true
+            switchChecked: page.sys ? page.sys.autoLogin : false
+            enabled: page.sys !== null && page.sys.available && !page.sys.busy
+            leading: Symbol {
+                icon: Symbols.Login
+            }
+            onSwitchToggled: checked => page.sys.changeAutoLogin(checked)
         }
     }
 
     Section {
         Layout.fillWidth: true
-        title: qsTr("Other People")
+        title: qsTr("Other Users")
         visible: page.sys !== null && page.sys.available
 
         Repeater {
@@ -139,6 +260,10 @@ SettingsPage {
             }
         }
         SectionRow {
+            visible: page.others.length === 0
+            title: qsTr("Only you use this computer.")
+        }
+        SectionRow {
             objectName: "add-user"
             title: qsTr("Add User")
             subtitle: qsTr("Give someone else their own account")
@@ -151,18 +276,9 @@ SettingsPage {
         }
     }
 
+    // Only the login screen's own settings (the registry's folded KCM).
     AdvancedSection {
         page: page
-
-        SectionRow {
-            objectName: "auto-login"
-            title: qsTr("Automatic Login")
-            subtitle: qsTr("Sign in as %1 when the computer starts, without a password").arg(page.sys && page.sys.meName !== "" ? page.sys.meName : qsTr("you"))
-            showSwitch: true
-            switchChecked: page.sys ? page.sys.autoLogin : false
-            enabled: page.sys !== null && page.sys.available && !page.sys.busy
-            onSwitchToggled: checked => page.sys.changeAutoLogin(checked)
-        }
     }
 
     RelatedLinks {
@@ -172,7 +288,7 @@ SettingsPage {
     // Your full name.
     TelamonDialog {
         id: nameSheet
-        title: qsTr("Full Name")
+        title: qsTr("Edit Name")
         preferredWidth: Kirigami.Units.gridUnit * 24
         onOpened: {
             nameField.text = page.sys ? page.sys.meRealName : "";
