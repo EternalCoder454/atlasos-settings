@@ -123,6 +123,7 @@ impl qobject::TimeLanguage {
         };
         match status {
             Ok(s) => {
+                self.as_mut().set_available(true);
                 self.as_mut()
                     .set_timezone(QString::from(s.timezone.as_str()));
                 self.as_mut().set_ntp(s.ntp);
