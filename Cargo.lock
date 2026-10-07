@@ -1341,6 +1341,7 @@ dependencies = [
 [[package]]
 name = "telamon-update-engine"
 version = "0.3.0"
+source = "git+https://github.com/EternalCoder454/atlasos-updater?rev=b481cf123ee314baad66f52b3f5414b34b92ebbb#b481cf123ee314baad66f52b3f5414b34b92ebbb"
 dependencies = [
  "libc",
  "rustix",
@@ -1354,6 +1355,7 @@ dependencies = [
 [[package]]
 name = "telamon-updater-base"
 version = "0.3.0"
+source = "git+https://github.com/EternalCoder454/atlasos-updater?rev=b481cf123ee314baad66f52b3f5414b34b92ebbb#b481cf123ee314baad66f52b3f5414b34b92ebbb"
 dependencies = [
  "libc",
  "rustix",
@@ -1370,6 +1372,7 @@ dependencies = [
 [[package]]
 name = "telamon-updater-core"
 version = "0.3.0"
+source = "git+https://github.com/EternalCoder454/atlasos-updater?rev=b481cf123ee314baad66f52b3f5414b34b92ebbb#b481cf123ee314baad66f52b3f5414b34b92ebbb"
 dependencies = [
  "libc",
  "pulldown-cmark",

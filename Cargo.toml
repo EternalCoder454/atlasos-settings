@@ -17,7 +17,7 @@ telamon-framework-ui = { git = "https://github.com/EternalCoder454/atlas-framewo
 log = { version = "0.4", features = ["std"] }
 # Telamon Updater's Qt-free code (the Updates page's logic), pinned to a revision
 # of atlasos-updater (CLAUDE.md, "Moving the telamon-updater-core pin").
-telamon-updater-core = { path = "/updater-src/crates/telamon-updater-core" }
+telamon-updater-core = { git = "https://github.com/EternalCoder454/atlasos-updater", rev = "b481cf123ee314baad66f52b3f5414b34b92ebbb" }
 settings-registry = { path = "crates/settings-registry" }
 settings-sys = { path = "crates/settings-sys" }
 

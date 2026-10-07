@@ -568,14 +568,32 @@ fn report_working(on: bool) {
         let spawned = std::thread::Builder::new()
             .name("telamon-glow".into())
             .spawn(move || {
+                // One connection for the life of the program: the tray ties
+                // the claim to it (settings_sys::updater::Glow).
+                let mut line: Option<settings_sys::updater::Glow> = None;
                 while let Ok(mut on) = rx.recv() {
                     while let Ok(newer) = rx.try_recv() {
                         on = newer;
                     }
-                    if let Some(Err(e)) = guarded(|| {
-                        settings_sys::updater::set_working(&Bus::Session, on).map_err(|e| e.detail)
-                    }) {
-                        log::warn!("the tray did not take the glow: {e}");
+                    for _ in 0..2 {
+                        if line.is_none() {
+                            line = guarded(|| settings_sys::updater::Glow::connect(&Bus::Session))
+                                .and_then(|r| {
+                                    r.map_err(|e| log::warn!("the tray's line: {}", e.detail))
+                                        .ok()
+                                });
+                        }
+                        let Some(glow) = &line else { break };
+                        match guarded(|| glow.set_working(on)) {
+                            Some(Ok(())) => break,
+                            Some(Err(e)) => {
+                                log::warn!("the tray did not take the glow: {}", e.detail);
+                                // A tray that went and came back has a new
+                                // connection to talk to: try once more.
+                                line = None;
+                            }
+                            None => break,
+                        }
                     }
                 }
             });

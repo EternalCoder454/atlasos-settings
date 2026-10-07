@@ -4,7 +4,7 @@ use crate::{Error, ErrorKind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
-use zbus::blocking::{Connection, connection};
+use zbus::blocking::Connection;
 
 /// How long a method call may take before it fails with
 /// [`ErrorKind::Timeout`](crate::ErrorKind::Timeout). Calls that wait for a

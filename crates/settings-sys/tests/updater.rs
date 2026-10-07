@@ -4,7 +4,7 @@ mod common;
 mod ext;
 
 use settings_sys::ErrorKind;
-use settings_sys::updater::{reload_tray, set_working};
+use settings_sys::updater::{Glow, reload_tray};
 
 const NAME: &str = "net.eterneon.telamon.updater.Tray";
 const PATH: &str = "/net/eterneon/telamon/updater/Tray";
@@ -29,8 +29,10 @@ fn tells_the_tray_when_the_system_is_being_changed() {
     };
     let _tray = ext::generic(&bus, NAME, PATH, NAME);
     ext::add_method(&bus, NAME, PATH, NAME, "SetWorking", ("b", ""), "pass");
-    set_working(&bus.bus(), true).expect("on");
-    set_working(&bus.bus(), false).expect("off");
+    // One connection for both: the tray ties the claim to it.
+    let glow = Glow::connect(&bus.bus()).expect("connect");
+    glow.set_working(true).expect("on");
+    glow.set_working(false).expect("off");
     assert_eq!(ext::calls(&bus, NAME, PATH), ["SetWorking", "SetWorking"]);
 }
 
@@ -39,7 +41,9 @@ fn no_tray_is_not_a_hang_for_the_glow_either() {
     let Some(bus) = common::MockBus::start() else {
         return;
     };
-    let e = set_working(&bus.bus(), true).unwrap_err();
+    let e = Glow::connect(&bus.bus())
+        .and_then(|g| g.set_working(true))
+        .unwrap_err();
     assert_eq!(e.kind, ErrorKind::NotRunning, "{e:?}");
 }
 

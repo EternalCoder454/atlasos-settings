@@ -37,15 +37,33 @@ pub fn reload_tray(bus: &Bus) -> Result<(), Error> {
     }
 }
 
-/// Tells the tray the system is being changed (an update, a channel switch
-/// or a go back being staged, apps or firmware being installed) or no longer
-/// is, so it draws the glow around the screens' edges, which lasts as long as
-/// that does whether Settings' window is open or not. The tray forgets it when
-/// the caller leaves the bus, so a crash leaves no glow behind. Only the new
-/// name has the method (an Updater from before the rename draws its own glow
-/// in its own window). Blocking, so for a worker thread.
-pub fn set_working(bus: &Bus, on: bool) -> Result<(), Error> {
-    let conn = bus.connect_with(LIMIT)?;
-    Proxy::new(&conn, NAME, PATH, NAME)?.call::<_, _, ()>("SetWorking", &(on,))?;
-    Ok(())
+/// The line to the tray for the screen glow: Telamon Updater's tray draws it
+/// around the screens' edges while the system is being changed (an update, a
+/// channel switch or a go back being staged, apps or firmware being
+/// installed) whether Settings' window is open or not. The claim belongs to
+/// the D-Bus connection that made it: the tray ends it when this connection
+/// goes (Settings quits or crashes), so a glow can't be left behind, and for
+/// the same reason the connection has to stay open for as long as the claim
+/// is wanted (keep one `Glow` for the life of the program; a connection made
+/// per call would end its own claim at once). Only the new name has the
+/// method (an Updater from before the rename draws its own glow in its own
+/// window).
+pub struct Glow {
+    conn: zbus::blocking::Connection,
+}
+
+impl Glow {
+    /// Connects (the tray is started when it isn't running, which takes a
+    /// moment). Blocking, so for a worker thread.
+    pub fn connect(bus: &Bus) -> Result<Glow, Error> {
+        Ok(Glow {
+            conn: bus.connect_with(LIMIT)?,
+        })
+    }
+
+    /// Claims (or lets go of) "the system is being changed". Blocking.
+    pub fn set_working(&self, on: bool) -> Result<(), Error> {
+        Proxy::new(&self.conn, NAME, PATH, NAME)?.call::<_, _, ()>("SetWorking", &(on,))?;
+        Ok(())
+    }
 }
