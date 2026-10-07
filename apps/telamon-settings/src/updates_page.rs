@@ -9,7 +9,8 @@
 //! page, or with the window closed, goes on and is shown again when they
 //! come back (`Main.qml` makes it once, on the first visit).
 //! Telamon Updater's tray keeps the schedule, the notifications and the
-//! screen glow; this page tells it when an operation starts and ends.
+//! screen glow; this page tells it when an operation that changes the OS
+//! image starts and ends (and only then: not app updates, not firmware).
 
 #[cxx_qt::bridge]
 pub mod qobject {
@@ -33,8 +34,9 @@ pub mod qobject {
         #[qproperty(bool, restarting, cxx_name = "restarting")]
         /// The system is being changed by an operation of this page: an
         /// update, a channel switch or a go back being staged, apps being
-        /// updated or firmware being installed (not checks). The screen glow
-        /// is on while this is, and the window stays until it ends.
+        /// updated or firmware being installed (not checks). The window
+        /// stays until it ends. (The screen glow is narrower than this: see
+        /// `glow_wanted`.)
         #[qproperty(bool, working, cxx_name = "working")]
         /// The operation whose failure set `errorText` (the `busyOp` names,
         /// plus "status", "restart" and "timer", which
@@ -302,6 +304,8 @@ pub struct UpdatesPageRust {
     apps_op: QString,
     restarting: bool,
     working: bool,
+    /// What the tray was last told (`SetWorking`): the glow.
+    glow_on: bool,
     error_op: QString,
     notes_version: QString,
     notes_error: QString,
@@ -544,6 +548,18 @@ pub extern "C" fn telamon_updates_flush() {
     }
 }
 
+/// Whether the screen glow shows: only while the OS image is being changed,
+/// that is while the system operation (`busy`, `busyOp`) is an update being
+/// downloaded and staged, a channel switch, or a go back or cancelling one.
+/// Never for checks, app (Flatpak) updates or firmware installs: those keep
+/// the window alive (`working`) but are not what the glow is for.
+fn glow_wanted(busy: bool, busy_op: &str) -> bool {
+    busy && matches!(
+        busy_op,
+        "download" | "switch" | "rollback" | "cancelRollback"
+    )
+}
+
 fn q(s: &str) -> QString {
     QString::from(s)
 }
@@ -632,24 +648,24 @@ impl qobject::UpdatesPage {
         self.sync_working();
     }
 
-    /// `working` follows the operations that change the system, and the
-    /// tray (which draws the glow around the screens' edges, whether this
-    /// window is open or not) is told when it changes.
+    /// `working` follows the operations that change the system (the window
+    /// stays while one runs). The tray, which draws the glow around the
+    /// screens' edges whether this window is open or not, is told only about
+    /// the ones that change the OS image (`glow_wanted`), and when that
+    /// changes.
     fn sync_working(mut self: Pin<&mut Self>) {
-        let busy = *self.busy()
-            && matches!(
-                self.busy_op().to_string().as_str(),
-                "download" | "switch" | "rollback" | "cancelRollback"
-            );
+        let image = glow_wanted(*self.busy(), &self.busy_op().to_string());
         let apps = *self.apps_busy() && self.apps_op().to_string() == "updateApps";
         let firmware = *self.firmware_busy() && self.firmware_op().to_string() == "installFirmware";
-        let working = busy || apps || firmware;
-        if *self.working() == working {
-            return;
+        let working = image || apps || firmware;
+        if *self.working() != working {
+            self.as_mut().set_working(working);
         }
-        self.as_mut().set_working(working);
-        if self.rust().fixtures.is_none() {
-            report_working(working);
+        if self.rust().glow_on != image {
+            self.as_mut().rust_mut().glow_on = image;
+            if self.rust().fixtures.is_none() {
+                report_working(image);
+            }
         }
     }
 
@@ -1802,6 +1818,29 @@ impl qobject::UpdatesPage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_glow_is_for_image_operations_only() {
+        // staging an update, switching channel, going back (and undoing it)
+        for op in ["download", "switch", "rollback", "cancelRollback"] {
+            assert!(glow_wanted(true, op), "{op}");
+            // an operation that is not running is not a glow
+            assert!(!glow_wanted(false, op), "{op}");
+        }
+        // checks, apps, firmware, restart and the unknown: no glow
+        for op in [
+            "check",
+            "checkApps",
+            "updateApps",
+            "installFirmware",
+            "restart",
+            "status",
+            "timer",
+            "",
+        ] {
+            assert!(!glow_wanted(true, op), "{op}");
+        }
+    }
 
     #[test]
     fn a_panicking_worker_is_reported_not_lost() {

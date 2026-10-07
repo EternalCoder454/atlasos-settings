@@ -422,9 +422,14 @@ the old window's backend without its crash report screens.
   (`working`) only hides it; the program goes when that ends
   (`cpp/main.cpp`, `keepRunning`). The first read of the page asks the
   helper (D-Bus activated), so a visit to another page never starts it.
-- **The glow** ("the system is being changed") belongs to Telamon Updater's
+- **The glow** ("the OS image is being changed") belongs to Telamon Updater's
   tray, which starts `telamon-updater-glow`, the one program that draws it
-  around the edges of every screen. Settings tells the tray when `working`
+  around the edges of every screen, **only while the OS image is being
+  changed**: an update being downloaded and staged (`busyOp` `download`), a
+  channel switch, a go back or cancelling one (`switch`, `rollback`,
+  `cancelRollback`: `glow_wanted` in `updates_page.rs`, unit tested). Not for
+  app (Flatpak) updates, firmware installs or checks: those keep the window
+  from quitting (`working`) but never glow. Settings tells the tray when that
   starts and ends (`settings_sys::updater::set_working`, the tray's
   `SetWorking` on the session bus; the tray forgets it when Settings leaves
   the bus, so a crash leaves no glow). An update, switch or go back that
