@@ -928,7 +928,10 @@ version = "0.1.1"
 name = "settings-sys"
 version = "0.1.1"
 dependencies = [
+ "async-io",
+ "futures-lite",
  "log",
+ "serde",
  "zbus",
 ]
 

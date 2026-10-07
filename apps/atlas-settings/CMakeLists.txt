@@ -73,6 +73,8 @@ qt_add_executable(atlas-settings-app
     cpp/launcher.cpp
     cpp/kcmcatalog.cpp
     cpp/localeconfig.cpp
+    cpp/powerconfig.cpp
+    cpp/screenlockconfig.cpp
     cpp/pagebackends.cpp)
 set_target_properties(atlas-settings-app PROPERTIES OUTPUT_NAME atlas-settings)
 target_include_directories(atlas-settings-app PRIVATE "${ATLAS_UI_CRATE_DIR}/include")
@@ -94,12 +96,17 @@ qt_add_qml_module(atlas-settings-app
         qml/TimeLanguagePage.qml
         qml/PickerSheet.qml
         qml/SystemPage.qml
+        qml/PowerPage.qml
+        qml/UsersPage.qml
+        qml/TimeoutSheet.qml
 )
 
 target_link_libraries(atlas-settings-app PRIVATE
     atlas_settings
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Widgets
-    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore)
+    KF6::CoreAddons KF6::DBusAddons KF6::WindowSystem KF6::KIOGui KF6::GuiAddons KF6::ConfigCore
+    # crypt(3), for the password hash AccountsService takes (settings-sys).
+    crypt)
 
 install(TARGETS atlas-settings-app RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES data/net.eterneon.atlas.settings.desktop
@@ -108,3 +115,16 @@ install(FILES data/net.eterneon.atlas.settings.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
 install(FILES data/net.eterneon.atlas.settings.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+
+# The KConfig-backed settings' tests: cmake -DATLAS_SETTINGS_TESTS=ON, then ctest.
+# They write only into a temporary XDG_CONFIG_HOME.
+option(ATLAS_SETTINGS_TESTS "Build the KConfig tests" OFF)
+if(ATLAS_SETTINGS_TESTS)
+    find_package(Qt6 6.11 REQUIRED COMPONENTS Test)
+    enable_testing()
+    add_executable(configtests tests/configtests.cpp
+        cpp/powerconfig.cpp
+        cpp/screenlockconfig.cpp)
+    target_link_libraries(configtests PRIVATE Qt6::Core Qt6::Test KF6::ConfigCore)
+    add_test(NAME configtests COMMAND configtests)
+endif()
