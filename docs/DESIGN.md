@@ -292,9 +292,15 @@ Plasma shell calls against fakes (`tests/fakes.h`) on a private session bus.
   `WizardThemePreview` and is a candidate for Telamon.Ui (with the wallpaper,
   dock and blur as options): ask the framework session before a second app
   copies it.
-- **Light or Dark** runs `plasma-apply-colorscheme AtlasOSLight|AtlasOSDark`
-  (with `--accent-color` when an accent is set), which writes `[General]
-  ColorScheme` into the user's kdeglobals and announces it: the keys
+- **Light or Dark** runs `plasma-apply-colorscheme TelamonLight|TelamonDark`,
+  which writes `[General] ColorScheme` into the user's kdeglobals and
+  announces it, and then, when an accent is set, `plasma-apply-colorscheme
+  --accent-color` once the name has landed (with `--accent-color` the tool
+  ignores a scheme named after it and only re-tints the current one, so the
+  two are separate calls). When the scheme is current already by the Global
+  Theme's defaults (`kdedefaults`) alone, the tool says "already set" and
+  writes nothing: Settings writes the name itself, with a notification.
+  Announced are the keys
   kvantum-sync watches, and gtkconfig, which follows for GTK. The icons
   (`Papirus`/`Papirus-Dark`) and the Aurorae window decoration follow when
   they are Telamon OS's own; a theme the user picked stays. The scheme shown is

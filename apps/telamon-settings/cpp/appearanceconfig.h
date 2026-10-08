@@ -110,8 +110,11 @@ Q_SIGNALS:
 
 private:
     QString currentScheme() const;
+    // [General] ColorScheme of the user's own kdeglobals, "" when it has none.
+    QString userScheme() const;
     QString accentHex() const;
     void applyScheme(const QString &scheme, const QString &accent);
+    void applyAccentOnceSchemeIs(const QString &scheme, const QStringList &argv, int generation, int tries);
     bool ensureHighContrastScheme(bool dark);
     void switchThemeParts(bool dark);
     void runShellScript(const QString &script);
@@ -121,4 +124,5 @@ private:
     QVariantMap m_shell;
     int m_desktopCount = 0;
     QStringList m_desktopIds;
+    int m_schemeGeneration = 0;
 };
