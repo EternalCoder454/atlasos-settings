@@ -3,6 +3,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtQuick.Controls as QQC2
+import QtCore
 import org.kde.kirigami as Kirigami
 import Telamon.Ui
 
@@ -27,6 +29,38 @@ SettingsPage {
     }
     // The person whose sheet is open.
     property var person: ({})
+    // The Launcher (cpp/launcher.h), to start the camera app.
+    property var launcher: null
+    // The camera apps, by desktop file ID: Camera (Plasma Camera, which the
+    // image ships), then ones people may have added.
+    readonly property var cameraApps: ["org.kde.plasma.camera", "org.kde.kamoso", "org.gnome.Snapshot", "org.gnome.Cheese"]
+    // "": nothing asked; "open": a camera app was started; "missing": none
+    // installed; "failed": it could not be started.
+    property string cameraState: ""
+
+    // Starts the camera app to take a picture. Camera saves into Pictures,
+    // where "Choose the Picture" then looks.
+    function openCamera() {
+        // failed() (too many windows, a program that won't start) sets
+        // "failed" while it runs: Main shows why, and no banner claims more.
+        page.cameraState = "";
+        const started = page.launcher ? page.launcher.runApplication(page.cameraApps) : "";
+        if (page.cameraState === "")
+            page.cameraState = started !== "" ? "open" : "missing";
+    }
+
+    Connections {
+        target: page.launcher
+        function onFailed() {
+            page.cameraState = "failed";
+        }
+    }
+
+    function choosePicture(fromCamera: bool) {
+        if (fromCamera)
+            pictureDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.PicturesLocation);
+        pictureDialog.open();
+    }
 
     readonly property var fingerNames: ({
             "right-index-finger": qsTr("Right Index Finger"),
@@ -62,6 +96,35 @@ SettingsPage {
         type: "warning"
         text: page.sys ? page.sys.error : ""
         shown: text !== ""
+    }
+
+    InfoBanner {
+        Layout.fillWidth: true
+        type: "info"
+        closable: true
+        shown: page.cameraState === "open"
+        text: qsTr("Camera is open. Take your picture, then choose it here.")
+        actions: [
+            QQC2.Action {
+                text: qsTr("Choose the Picture…")
+                onTriggered: page.choosePicture(true)
+            }
+        ]
+        onClosed: page.cameraState = ""
+    }
+    InfoBanner {
+        Layout.fillWidth: true
+        type: "warning"
+        closable: true
+        shown: page.cameraState === "missing"
+        text: qsTr("No camera app is installed on this computer. Telamon Store has Snapshot, a simple one.")
+        actions: [
+            QQC2.Action {
+                text: qsTr("Open Telamon Store")
+                onTriggered: page.run(["telamon-store", "--app", "org.gnome.Snapshot"])
+            }
+        ]
+        onClosed: page.cameraState = ""
     }
 
     // You, big: your picture and name, and what to change about them. The
@@ -119,22 +182,61 @@ SettingsPage {
                 border.color: TelamonStyle.focus
                 visible: pictureButton.activeFocus
             }
-            // The camera: this picture can be changed.
+            // The camera: takes a new picture with the camera app. A button of
+            // its own on the picture (the picture itself opens the file chooser).
             Rectangle {
+                id: cameraButton
+                objectName: "camera"
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 // Whole, even pixels, so the symbol can sit on the exact middle.
                 width: Math.round(Kirigami.Units.gridUnit * 0.9) * 2
                 height: width
                 radius: width / 2
-                color: TelamonStyle.surfaceRaised
+                color: cameraHover.hovered || cameraButton.activeFocus ? TelamonStyle.accent : TelamonStyle.surfaceRaised
                 border.width: 1
                 border.color: TelamonStyle.controlBorder
+                activeFocusOnTab: true
+                Accessible.role: Accessible.Button
+                Accessible.name: qsTr("Take a Picture")
+                Accessible.focusable: true
+                Accessible.onPressAction: page.openCamera()
+                Keys.onSpacePressed: page.openCamera()
+                Keys.onReturnPressed: page.openCamera()
 
+                Behavior on color {
+                    enabled: !TelamonStyle.reducedMotion
+                    ColorAnimation {
+                        duration: TelamonStyle.durationShort
+                    }
+                }
                 Symbol {
                     anchors.centerIn: parent
                     icon: Symbols.PhotoCamera
                     size: Math.round(parent.width * 0.275) * 2
+                    color: cameraHover.hovered || cameraButton.activeFocus ? TelamonStyle.accentText : TelamonStyle.text
+                }
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: -2
+                    radius: width / 2
+                    color: "transparent"
+                    border.width: 2
+                    border.color: TelamonStyle.focus
+                    visible: cameraButton.activeFocus
+                }
+                HoverHandler {
+                    id: cameraHover
+                    cursorShape: Qt.PointingHandCursor
+                }
+                // Takes the press, so it doesn't also open the file chooser.
+                TapHandler {
+                    gesturePolicy: TapHandler.ReleaseWithinBounds
+                    onTapped: page.openCamera()
+                }
+                TelamonToolTip {
+                    text: qsTr("Take a Picture")
+                    shown: cameraHover.hovered || cameraButton.activeFocus
                 }
             }
             HoverHandler {

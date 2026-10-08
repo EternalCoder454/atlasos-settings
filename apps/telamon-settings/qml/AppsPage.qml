@@ -237,6 +237,7 @@ SettingsPage {
     // Startup Apps.
     TelamonDialog {
         id: startupSheet
+        DialogScroll {}
         title: qsTr("Startup Apps")
         preferredWidth: Kirigami.Units.gridUnit * 30
         footerContent: [
@@ -308,6 +309,7 @@ SettingsPage {
     // The Flatpak apps.
     TelamonDialog {
         id: permissionsSheet
+        DialogScroll {}
         title: qsTr("App Permissions")
         preferredWidth: Kirigami.Units.gridUnit * 30
         footerContent: [
@@ -354,6 +356,7 @@ SettingsPage {
     // One app's permissions.
     TelamonDialog {
         id: appSheet
+        DialogScroll {}
         title: page.appName
         preferredWidth: Kirigami.Units.gridUnit * 30
         footerContent: [

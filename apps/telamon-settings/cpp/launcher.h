@@ -23,10 +23,25 @@ public:
     // ask for them).
     Q_INVOKABLE bool run(const QStringList &argv);
 
+    // Starts the first of `desktopNames` that is installed (desktop file IDs
+    // without ".desktop", such as "org.kde.plasma.camera"), from its desktop
+    // file through KIO's ApplicationLauncherJob: the file's own Exec line, no
+    // shell, Flatpaks and all. Returns the name that was started, or "" when
+    // none is installed (nothing is started and failed() is not emitted; the
+    // caller says so) or the start was refused for the limits (failed() is). A name that is not a plain desktop file ID is skipped.
+    // Counts against the same limits as run().
+    Q_INVOKABLE QString runApplication(const QStringList &desktopNames);
+
 Q_SIGNALS:
     void failed(const QString &program, const QString &message);
 
 private:
+    // False when `key` is a repeat within 2 s or more than MaxStarts programs
+    // started in 10 s (failed() is emitted for the second).
+    bool allowed(const QStringList &key, const QString &program);
+    // Remembers that `key` was started now.
+    void recordStart(const QStringList &key);
+
     static constexpr int MaxStarts = 5;
     QStringList m_last;
     QElapsedTimer m_lastStarted;

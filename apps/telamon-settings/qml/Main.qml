@@ -471,6 +471,7 @@ TelamonWindow {
             pageBackends: root.pageBackends
             onOpenPage: (id, item) => root.openPage(id, item)
             onOpenKcm: name => root.openKcm(name, "")
+            launcher: root.launcher
             onRun: argv => root.run(argv)
         }
     }

@@ -10,6 +10,7 @@ mod network;
 mod power_page;
 mod privacy_page;
 mod support;
+mod system_firmware;
 mod system_info;
 mod time_language;
 mod updates_page;
