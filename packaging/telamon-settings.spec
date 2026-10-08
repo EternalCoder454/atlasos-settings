@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           telamon-settings
-Version:        0.4.2
+Version:        0.4.3
 Release:        1%{?dist}
 Summary:        Settings, the settings app of Telamon OS
 License:        MIT
@@ -235,6 +235,15 @@ appstream-util validate-relax --nonet \
 %{_datadir}/applications/kdesystemsettings.desktop
 
 %changelog
+* Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.3-1
+- Crash Reports: every report is a closed row that opens to its details, and
+  the sheet scrolls evenly (60 px a wheel notch, no stack trace taking the
+  wheel); the sheets with long lists (App Permissions, Startup Apps, What's
+  New, Update History) scroll the same way.
+- Accounts: the camera on the picture starts the camera app (Plasma Camera,
+  else Kamoso or Snapshot) and offers to choose the picture it takes; with no
+  camera app it opens Telamon Store at Snapshot.
+
 * Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.2-1
 - Light or Dark now changes the colour scheme. With an accent set (always, as
   Violet is one) the tool Settings ran ignored the scheme and only re-tinted

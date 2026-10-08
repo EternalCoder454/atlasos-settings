@@ -380,7 +380,10 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   are PowerDevil's (`cpp/powerconfig.cpp`).
 - **Accounts** (page ID `users`, so links and searches for Users still land
   on it). It reads as your account first: a header with your picture (tap it
-  to change it), full name, "user name · Administrator" and the buttons
+  to change it, or the camera on it to take one: `Launcher::runApplication`
+  starts Plasma Camera, else Kamoso, Snapshot or Cheese, from its desktop file
+  through KIO, and a banner offers the file chooser at Pictures, where Camera
+  saves; with none installed it opens Telamon Store at Snapshot), full name, "user name · Administrator" and the buttons
   Change Picture and Edit Name; then Sign-In Options (Password, Fingerprint
   when there is a reader, Automatic Login); then Other Users (each person
   opens a sheet to make them an administrator or remove them, and the last
@@ -413,11 +416,17 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   same call Updater uses, then Telamon Updater's tray is told to `Reload`
   (it collects the reports and says when one waits). "Review Crash Reports"
   (a sheet, `src/crash_reports.rs`, the Crash Reports screens of Updater's old
-  window) lists the reports waiting with exactly the data that would be
-  sent, and sends one only when the person presses Send for it (the
-  framework's `crash::send`); Don't Send deletes it; the reports sent in the
-  last 90 days are listed below. Links come from the sheet's data only when
-  `https://`.
+  window) lists the reports waiting, each a closed row that opens to the
+  data that would be sent (the traces are as tall as their text: a view that
+  scrolled by itself would take the wheel from the sheet), and sends one only
+  when the person presses Send for it (the framework's `crash::send`); Don't
+  Send deletes it; the reports sent in the last 90 days are listed below.
+  Links come from the sheet's data only when `https://`. Which crashes are
+  collected (the host's own, not containers' or programs outside the OS) is
+  the framework's rule since 2.0.2. A `TelamonDialog` scrolls its body in a
+  bare Flickable, which moves 28 to 38 px a wheel notch, unevenly; the
+  dialogs whose lists can outgrow the window hold a `DialogScroll`, which
+  gives it the pages' `Kirigami.WheelHandler` (60 px a notch).
 - **Apps.** Default Apps are `~/.config/mimeapps.list` (`[Default
   Applications]`, `[Added Associations]`) for the file types a kind covers,
   chosen only among the apps KService offers for it; the terminal is
