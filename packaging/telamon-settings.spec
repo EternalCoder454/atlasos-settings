@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           telamon-settings
-Version:        0.4.3
+Version:        0.4.4
 Release:        1%{?dist}
 Summary:        Settings, the settings app of Telamon OS
 License:        MIT
@@ -235,6 +235,13 @@ appstream-util validate-relax --nonet \
 %{_datadir}/applications/kdesystemsettings.desktop
 
 %changelog
+* Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.4-1
+- Settings pinned in the dock opens on its pinned icon again, not as a second
+  icon beside it. The hidden systemsettings.desktop and kdesystemsettings.desktop
+  named Settings' window class (StartupWMClass), so Plasma matched the window
+  to them instead of to net.eterneon.telamon.settings.desktop, the pin. They
+  no longer name it: the window already carries its desktop file's name.
+
 * Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.3-1
 - Crash Reports: every report is a closed row that opens to its details, and
   the sheet scrolls evenly (60 px a wheel notch, no stack trace taking the

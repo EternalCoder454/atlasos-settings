@@ -16,6 +16,10 @@ function(telamon_settings_sound_test name)
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endfunction()
 
+# Needs no Qt: only reads the desktop files in data/.
+add_test(NAME desktop_wmclass_test
+    COMMAND ${CMAKE_COMMAND} -DDATA_DIR=${CMAKE_CURRENT_SOURCE_DIR}/../data -P ${CMAKE_CURRENT_SOURCE_DIR}/desktop_wmclass_test.cmake)
+
 telamon_settings_test(displaylogic_test)
 telamon_settings_sound_test(soundlogic_test)
 telamon_settings_sound_test(soundmixer_test)
