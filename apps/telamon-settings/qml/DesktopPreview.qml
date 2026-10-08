@@ -656,7 +656,7 @@ Item {
                     radius: scene.px(2)
                     // Until the icon theme answers (or when it has no such icon).
                     color: icon.valid ? "transparent" : scene._control
-                    Kirigami.Icon {
+                    SettingsIcon {
                         id: icon
                         anchors.fill: parent
                         source: app.modelData

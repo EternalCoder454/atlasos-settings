@@ -30,6 +30,7 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="0.4.6" date="2026-10-08"/>
     <release version="0.4.5" date="2026-10-08"/>
     <release version="0.4.4" date="2026-10-07"/>
     <release version="0.4.3" date="2026-10-07"/>

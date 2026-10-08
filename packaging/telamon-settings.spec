@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           telamon-settings
-Version:        0.4.5
+Version:        0.4.6
 Release:        1%{?dist}
 Summary:        Settings, the settings app of Telamon OS
 License:        MIT
@@ -235,6 +235,11 @@ appstream-util validate-relax --nonet \
 %{_datadir}/applications/kdesystemsettings.desktop
 
 %changelog
+* Thu Oct 08 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.6-1
+- Fix: icons drawn over dialogs, popups and menus. With Qt Quick's software renderer a Kirigami.Icon was
+  painted again over what sat in front of it whenever a repaint touched a part of it; the app's icons are
+  layers on that renderer now.
+
 * Thu Oct 08 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.5-1
 - Updates: a newer version published after one was downloaded is offered, not
   hidden. With an update waiting for a restart, the page kept saying "Restart to
