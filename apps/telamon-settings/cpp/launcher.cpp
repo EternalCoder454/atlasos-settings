@@ -1,23 +1,22 @@
 #include "launcher.h"
 
+#include <KIO/ApplicationLauncherJob>
 #include <KIO/CommandLauncherJob>
+#include <KService>
 #include <KJobWindows>
 
 #include <QDebug>
 #include <QGuiApplication>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QWindow>
 
-bool Launcher::run(const QStringList &argv)
+bool Launcher::allowed(const QStringList &key, const QString &program)
 {
-    if (argv.isEmpty() || argv.first().isEmpty()) {
-        return false;
-    }
-    const QString program = argv.first();
     // kcmshell6 takes a moment to show its window; clicks meanwhile would
     // each open another.
-    if (argv == m_last && m_lastStarted.isValid() && m_lastStarted.elapsed() < 2000) {
-        return true;
+    if (key == m_last && m_lastStarted.isValid() && m_lastStarted.elapsed() < 2000) {
+        return false;
     }
     if (!m_clock.isValid()) {
         m_clock.start();
@@ -29,6 +28,25 @@ bool Launcher::run(const QStringList &argv)
     if (m_starts.size() >= MaxStarts) {
         qWarning().noquote() << "not starting" << program << ": too many windows opened in the last 10 s";
         Q_EMIT failed(program, tr("Too many windows were opened at once. Try again in a moment."));
+        return false;
+    }
+    return true;
+}
+
+void Launcher::recordStart(const QStringList &key)
+{
+    m_last = key;
+    m_lastStarted.start();
+    m_starts.append(m_clock.elapsed());
+}
+
+bool Launcher::run(const QStringList &argv)
+{
+    if (argv.isEmpty() || argv.first().isEmpty()) {
+        return false;
+    }
+    const QString program = argv.first();
+    if (!allowed(argv, program)) {
         return true;
     }
     // Only the system's own programs, by name: a program of the same name
@@ -39,9 +57,7 @@ bool Launcher::run(const QStringList &argv)
         Q_EMIT failed(program, tr("It isn't installed."));
         return true;
     }
-    m_last = argv;
-    m_lastStarted.start();
-    m_starts.append(now);
+    recordStart(argv);
     // An executable and an argument list: KIO starts it without a shell.
     auto *job = new KIO::CommandLauncherJob(path, argv.mid(1), this);
     // The window asking, for the activation token.
@@ -58,4 +74,37 @@ bool Launcher::run(const QStringList &argv)
     });
     job->start();
     return true;
+}
+
+QString Launcher::runApplication(const QStringList &desktopNames)
+{
+    static const QRegularExpression plainId(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"));
+    for (const QString &name : desktopNames) {
+        if (!plainId.match(name).hasMatch()) {
+            continue;
+        }
+        const KService::Ptr service = KService::serviceByDesktopName(name);
+        if (!service || !service->isValid() || !service->isApplication()) {
+            continue;
+        }
+        const QStringList key{QStringLiteral("desktop:") + name};
+        if (!allowed(key, name)) {
+            return name;
+        }
+        recordStart(key);
+        auto *job = new KIO::ApplicationLauncherJob(service, this);
+        if (QWindow *window = QGuiApplication::focusWindow()) {
+            KJobWindows::setWindow(job, window);
+        }
+        connect(job, &KJob::result, this, [this, name](KJob *job) {
+            if (job->error()) {
+                qWarning().noquote() << "starting" << name << "failed:" << job->errorString();
+                m_last.clear();
+                Q_EMIT failed(name, job->errorString());
+            }
+        });
+        job->start();
+        return name;
+    }
+    return QString();
 }

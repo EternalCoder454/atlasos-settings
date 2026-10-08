@@ -735,6 +735,7 @@ SettingsPage {
     // What's New: the release notes of the version waiting or on offer.
     TelamonDialog {
         id: notesSheet
+        DialogScroll {}
         title: qsTr("What's New in %1").arg(page.updates.notesVersion)
         preferredWidth: Kirigami.Units.gridUnit * 32
         footerContent: [
@@ -857,6 +858,7 @@ SettingsPage {
     // and the app updates installed here.
     TelamonDialog {
         id: historySheet
+        DialogScroll {}
         title: qsTr("Update History")
         preferredWidth: Kirigami.Units.gridUnit * 36
         onAboutToShow: {

@@ -7,8 +7,8 @@ import Telamon.Ui
 import "dates.js" as Dates
 
 // Privacy & Security's "Review Crash Reports": the reports waiting for the
-// person's decision, each with exactly the data that would be sent, and the
-// ones sent in the last 90 days. Nothing is sent unless they press Send on
+// person's decision, each a closed row that opens to the data that would be
+// sent, and the ones sent in the last 90 days. Nothing is sent unless they press Send on
 // that report. `reports` is src/crash_reports.rs.
 TelamonDialog {
     id: sheet
@@ -20,6 +20,7 @@ TelamonDialog {
     onAboutToShow: if (reports) {
         reports.refresh();
         showSent = false;
+        openIds = ({});
     }
     footerContent: [
         PrimaryButton {
@@ -31,6 +32,20 @@ TelamonDialog {
     readonly property var pending: reports && reports.reportsJson.length > 0 ? JSON.parse(reports.reportsJson) : []
     readonly property var sent: reports && reports.sentJson.length > 0 ? JSON.parse(reports.sentJson) : []
     property bool showSent: false
+    // The reports opened, by event ID. Kept here, not in the rows: the list is
+    // made again whenever a report is sent or deleted, and an open one would
+    // close.
+    property var openIds: ({})
+    function toggle(id: string): void {
+        const next = Object.assign({}, sheet.openIds);
+        if (next[id])
+            delete next[id];
+        else
+            next[id] = true;
+        sheet.openIds = next;
+    }
+
+    DialogScroll {}
 
     InfoBanner {
         id: errorBanner
@@ -54,105 +69,121 @@ TelamonDialog {
         text: qsTr("When something crashes, the report shows up here and nothing is sent unless you say so.")
     }
 
+    // Each report is one row, closed until it is opened: twelve open ones
+    // are a wall of text to scroll through, and the page opens at the top of
+    // the list rather than inside the first report's stack trace.
     Repeater {
         model: sheet.pending
-        delegate: ColumnLayout {
+        delegate: Section {
             id: card
             required property var modelData
+            readonly property bool expanded: sheet.openIds[card.modelData.eventId] === true
             property bool showPayload: false
             Layout.fillWidth: true
-            spacing: Kirigami.Units.largeSpacing
 
-            Section {
-                Layout.fillWidth: true
-                title: qsTr("%1 %2").arg(card.modelData.appName).arg(card.modelData.appVersion)
-                footer: card.modelData.message
-
-                SectionRow {
-                    title: qsTr("Category")
-                    value: card.modelData.category + " · " + card.modelData.type
-                }
-                SectionRow {
-                    title: qsTr("When")
-                    value: Dates.longDate(card.modelData.time)
-                }
-                SectionRow {
-                    title: qsTr("Telamon OS")
-                    value: card.modelData.osVersion + (card.modelData.channel ? " (" + card.modelData.channel + ")" : "")
-                }
-                SectionRow {
-                    title: qsTr("Previous version")
-                    value: card.modelData.previousVersion || qsTr("none")
-                }
-                SectionRow {
-                    title: qsTr("Kernel")
-                    value: card.modelData.kernel
-                }
-                SectionRow {
-                    title: qsTr("Graphics")
-                    value: card.modelData.gpu + (card.modelData.gpuDriver ? " · " + card.modelData.gpuDriver : "")
-                }
-                SectionRow {
-                    title: qsTr("Uptime")
-                    value: card.modelData.uptime
-                }
+            SectionRow {
+                objectName: "report-" + card.modelData.eventId
+                title: card.modelData.appVersion !== "" ? qsTr("%1 %2").arg(card.modelData.appName).arg(card.modelData.appVersion) : card.modelData.appName
+                subtitle: qsTr("%1 · %2").arg(Dates.longDate(card.modelData.time)).arg(card.modelData.message)
+                chevron: true
+                disclosure: true
+                expanded: card.expanded
+                onClicked: sheet.toggle(card.modelData.eventId)
+                Accessible.description: card.expanded ? qsTr("Expanded") : qsTr("Collapsed")
             }
-
-            Section {
-                Layout.fillWidth: true
+            SectionRow {
+                visible: card.expanded
+                title: qsTr("Category")
+                value: card.modelData.category + " · " + card.modelData.type
+            }
+            SectionRow {
+                visible: card.expanded
+                title: qsTr("When")
+                value: Dates.longDate(card.modelData.time)
+            }
+            SectionRow {
+                visible: card.expanded
+                title: qsTr("Telamon OS")
+                value: card.modelData.osVersion + (card.modelData.channel ? " (" + card.modelData.channel + ")" : "")
+            }
+            SectionRow {
+                visible: card.expanded
+                title: qsTr("Previous version")
+                value: card.modelData.previousVersion || qsTr("none")
+            }
+            SectionRow {
+                visible: card.expanded
+                title: qsTr("Kernel")
+                value: card.modelData.kernel
+            }
+            SectionRow {
+                visible: card.expanded
+                title: qsTr("Graphics")
+                value: card.modelData.gpu + (card.modelData.gpuDriver ? " · " + card.modelData.gpuDriver : "")
+            }
+            SectionRow {
+                visible: card.expanded
+                title: qsTr("Uptime")
+                value: card.modelData.uptime
+            }
+            SectionRow {
+                visible: card.expanded && card.modelData.stacktrace.length > 0
                 title: qsTr("Stack Trace")
-                visible: card.modelData.stacktrace.length > 0
-                TelamonCodeView {
-                    Layout.fillWidth: true
-                    // Text lines up with the rows' text (SectionRow pads 12).
-                    Layout.leftMargin: TelamonStyle.spacingLarge
-                    Layout.rightMargin: TelamonStyle.spacingSmall
-                    Layout.topMargin: TelamonStyle.spacingSmall
-                    Layout.bottomMargin: TelamonStyle.spacingSmall
-                    framed: false
-                    showCopy: true
-                    maximumHeight: Kirigami.Units.gridUnit * 10
-                    text: card.modelData.stacktrace
-                    Accessible.name: qsTr("Stack Trace")
-                }
             }
-
-            Section {
+            // The traces are as tall as their text: a view that scrolled by
+            // itself would take the wheel from the sheet while the pointer
+            // is over it.
+            TelamonCodeView {
+                visible: card.expanded && card.modelData.stacktrace.length > 0
                 Layout.fillWidth: true
-                SectionRow {
-                    title: card.showPayload ? qsTr("Hide Exact Data") : qsTr("Show Exact Data")
-                    subtitle: qsTr("Exactly what would be sent")
-                    chevron: true
-                    disclosure: true
-                    expanded: card.showPayload
-                    onClicked: card.showPayload = !card.showPayload
-                }
-                TelamonCodeView {
-                    visible: card.showPayload
-                    Layout.fillWidth: true
-                    Layout.leftMargin: TelamonStyle.spacingLarge
-                    Layout.rightMargin: TelamonStyle.spacingSmall
-                    Layout.topMargin: TelamonStyle.spacingSmall
-                    Layout.bottomMargin: TelamonStyle.spacingSmall
-                    framed: false
-                    showCopy: true
-                    maximumHeight: Kirigami.Units.gridUnit * 14
-                    text: card.modelData.payload
-                    Accessible.name: qsTr("Exact data")
-                }
+                // Text lines up with the rows' text (SectionRow pads 12).
+                Layout.leftMargin: TelamonStyle.spacingLarge
+                Layout.rightMargin: TelamonStyle.spacingSmall
+                Layout.topMargin: TelamonStyle.spacingSmall
+                Layout.bottomMargin: TelamonStyle.spacingSmall
+                framed: false
+                showCopy: true
+                text: card.modelData.stacktrace
+                Accessible.name: qsTr("Stack Trace")
             }
-
+            SectionRow {
+                visible: card.expanded
+                title: card.showPayload ? qsTr("Hide Exact Data") : qsTr("Show Exact Data")
+                subtitle: qsTr("Exactly what would be sent")
+                chevron: true
+                disclosure: true
+                expanded: card.showPayload
+                onClicked: card.showPayload = !card.showPayload
+            }
+            TelamonCodeView {
+                visible: card.expanded && card.showPayload
+                Layout.fillWidth: true
+                Layout.leftMargin: TelamonStyle.spacingLarge
+                Layout.rightMargin: TelamonStyle.spacingSmall
+                Layout.topMargin: TelamonStyle.spacingSmall
+                Layout.bottomMargin: TelamonStyle.spacingSmall
+                framed: false
+                showCopy: true
+                text: card.modelData.payload
+                Accessible.name: qsTr("Exact data")
+            }
             TelamonLabel {
+                visible: card.expanded && sheet.reports && sheet.reports.hasServer
                 Layout.fillWidth: true
-                Layout.leftMargin: Kirigami.Units.largeSpacing
+                Layout.leftMargin: TelamonStyle.spacingLarge
+                Layout.rightMargin: TelamonStyle.spacingLarge
+                Layout.topMargin: TelamonStyle.spacingSmall
                 text: qsTr("Sending posts this report as a public issue on GitHub. Anyone can read it, including the stack trace and your Telamon OS version, kernel, CPU, GPU and memory.")
                 textStyle: TelamonLabel.Caption
                 wrapMode: Text.WordWrap
-                visible: sheet.reports && sheet.reports.hasServer
             }
-
             Flow {
+                visible: card.expanded
                 Layout.fillWidth: true
+                Layout.leftMargin: TelamonStyle.spacingLarge
+                Layout.rightMargin: TelamonStyle.spacingLarge
+                Layout.topMargin: TelamonStyle.spacingSmall
+                Layout.bottomMargin: TelamonStyle.spacingLarge
                 spacing: Kirigami.Units.largeSpacing
                 PrimaryButton {
                     text: qsTr("Send")

@@ -123,6 +123,7 @@ qt_add_qml_module(telamon-settings-app
         qml/SystemPage.qml
         qml/UpdatesPage.qml
         qml/CrashReportsSheet.qml
+        qml/DialogScroll.qml
         qml/dates.js
         qml/DisplaysPage.qml
         qml/ArrangementView.qml
@@ -177,6 +178,11 @@ if(BUILD_TESTING)
     target_include_directories(actionservice_test PRIVATE cpp)
     target_link_libraries(actionservice_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test KF6::DBusAddons)
     set_target_properties(actionservice_test PROPERTIES AUTOMOC ON)
+    # Launcher::runApplication, against a desktop file made in the test.
+    add_executable(launcher_test tests/launcher_test.cpp cpp/launcher.cpp cpp/launcher.h)
+    target_include_directories(launcher_test PRIVATE cpp)
+    target_link_libraries(launcher_test PRIVATE Qt6::Core Qt6::Gui Qt6::Test KF6::KIOGui KF6::Service KF6::CoreAddons KF6::GuiAddons)
+    set_target_properties(launcher_test PROPERTIES AUTOMOC ON)
     # Stands in for KWin and Plasma's shell in the smoke runs (never installed).
     add_executable(fake_desktop tests/fake_desktop.cpp tests/fakes.h)
     target_link_libraries(fake_desktop PRIVATE Qt6::Core Qt6::DBus)
@@ -185,11 +191,14 @@ if(BUILD_TESTING)
         add_test(NAME pageconfig COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:pageconfig_test>)
         add_test(NAME legacyservice COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:legacyservice_test>)
         add_test(NAME actionservice COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:actionservice_test>)
+        add_test(NAME launcher COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:launcher_test>)
     else()
         add_test(NAME pageconfig COMMAND pageconfig_test)
         add_test(NAME legacyservice COMMAND legacyservice_test)
         add_test(NAME actionservice COMMAND actionservice_test)
+        add_test(NAME launcher COMMAND launcher_test)
     endif()
+    set_tests_properties(launcher PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 # Displays' C++: the screens (libkscreen) and Night Light (kwinrc). A library
