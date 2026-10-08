@@ -474,6 +474,19 @@ the old window's backend without its crash report screens.
   History (the versions this computer ran with their release notes, and the
   app updates), each in a sheet. A link to Privacy & Security is where
   crash reports are.
+- **A staged update does not stop the search for a newer one.** `bootc upgrade`
+  stages the newest image over the staged one, and `upgrade --check` records
+  a newer image next to a staged one, so while an update waits for a restart
+  the page keeps Check for Updates, and when a newer version is available
+  (`availableReplacesStaged`: staged, available, not the image the user went
+  back from, not one that failed its boot checks, no go back queued) it says
+  "Telamon OS X is available", puts Download Update first and makes the restart
+  a secondary "Restart to Install Y" naming the staged version. The download's
+  text says it replaces the downloaded one, and What's New is the newest
+  version's. Fixture state `staged-newer-available`. (The rule is
+  `available_replaces_staged` in `updates_page.rs` until the pin moves past
+  `View::available_replaces_staged` in telamon-updater-core, whose framework tag
+  differs from this app's.)
 - **The system helper** is the Updater package's (`telamon-system-helper`,
   D-Bus name `net.eterneon.telamon.SystemHelper`, six methods and a
   `Progress` property, polkit actions of its own). Settings adds no method,

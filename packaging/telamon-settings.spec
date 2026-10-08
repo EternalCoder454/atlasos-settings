@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           telamon-settings
-Version:        0.4.4
+Version:        0.4.5
 Release:        1%{?dist}
 Summary:        Settings, the settings app of Telamon OS
 License:        MIT
@@ -235,6 +235,16 @@ appstream-util validate-relax --nonet \
 %{_datadir}/applications/kdesystemsettings.desktop
 
 %changelog
+* Thu Oct 08 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.5-1
+- Updates: a newer version published after one was downloaded is offered, not
+  hidden. With an update waiting for a restart, the page kept saying "Restart to
+  finish updating" for the old version and had no Check for Updates or Download
+  Update, so the restart landed on the old version and the newer one needed a
+  second restart. Now Check for Updates stays while an update waits, and when
+  a newer version is available the page says so, "Download Update" comes first
+  (it replaces the downloaded version, one restart starts the newest), and the
+  restart button names the version it starts. The download says it replaces
+  the downloaded one, and its release notes are the newest version's.
 * Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.4-1
 - Settings pinned in the dock opens on its pinned icon again, not as a second
   icon beside it. The hidden systemsettings.desktop and kdesystemsettings.desktop
