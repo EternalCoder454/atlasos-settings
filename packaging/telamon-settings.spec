@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           telamon-settings
-Version:        0.4.1
+Version:        0.4.2
 Release:        1%{?dist}
 Summary:        Settings, the settings app of Telamon OS
 License:        MIT
@@ -235,6 +235,14 @@ appstream-util validate-relax --nonet \
 %{_datadir}/applications/kdesystemsettings.desktop
 
 %changelog
+* Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.2-1
+- Light or Dark now changes the colour scheme. With an accent set (always, as
+  Violet is one) the tool Settings ran ignored the scheme and only re-tinted
+  the current one, so the scheme was never written to kdeglobals. The scheme is
+  applied first and the accent after it, and a scheme that only the Global
+  Theme's defaults name is written to kdeglobals, where Flatpak apps and
+  kvantum-sync's first read of a session find it.
+
 * Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.1-1
 - Appearance shows a live preview of the desktop: your wallpaper, the top
   bar, a window in the chosen Light/Dark and accent, and the dock. Hovering a

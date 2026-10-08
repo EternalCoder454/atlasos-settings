@@ -285,12 +285,17 @@ void AppearanceConfig::scheduleRead()
     QTimer::singleShot(600, this, &AppearanceConfig::changed);
 }
 
+QString AppearanceConfig::userScheme() const
+{
+    KConfig userConfig(kdeutil::configHome() + u"/kdeglobals"_s, KConfig::SimpleConfig);
+    return KConfigGroup(&userConfig, u"General"_s).readEntry("ColorScheme", QString());
+}
+
 QString AppearanceConfig::currentScheme() const
 {
     // As kvantum-sync reads it: the user's kdeglobals, then the Global
     // Theme's defaults (kdedefaults), then the system's.
-    KConfig userConfig(kdeutil::configHome() + u"/kdeglobals"_s, KConfig::SimpleConfig);
-    QString scheme = KConfigGroup(&userConfig, u"General"_s).readEntry("ColorScheme", QString());
+    QString scheme = userScheme();
     if (scheme.isEmpty()) {
         KConfig defaults(kdeutil::configHome() + u"/kdedefaults/kdeglobals"_s, KConfig::SimpleConfig);
         scheme = KConfigGroup(&defaults, u"General"_s).readEntry("ColorScheme", QString());
@@ -400,13 +405,49 @@ QVariantMap AppearanceConfig::read() const
 
 void AppearanceConfig::applyScheme(const QString &scheme, const QString &accent)
 {
-    QStringList argv{u"plasma-apply-colorscheme"_s};
-    if (!accent.isEmpty()) {
-        argv << u"--accent-color"_s << accent;
+    // plasma-apply-colorscheme given --accent-color ignores the scheme named
+    // after it: it only re-tints the scheme that is current. So a change of
+    // scheme is its own call (which writes [General] ColorScheme and the
+    // colours), and the accent follows once that has landed.
+    const QStringList accentArgv{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, accent};
+    const int generation = ++m_schemeGeneration;
+    if (scheme != currentScheme()) {
+        Q_EMIT run({u"plasma-apply-colorscheme"_s, scheme});
+        if (!accent.isEmpty()) {
+            applyAccentOnceSchemeIs(scheme, accentArgv, generation, 50);
+        }
+    } else if (accent.isEmpty()) {
+        Q_EMIT run({u"plasma-apply-colorscheme"_s, scheme});
+    } else {
+        // The scheme is current, by the Global Theme's defaults alone when the
+        // user's kdeglobals has no ColorScheme: the tool then calls it "already
+        // set" and writes nothing, and the accent call doesn't write it
+        // either. Without the name there, whatever reads kdeglobals alone
+        // (Flatpak apps) doesn't know the scheme.
+        if (userScheme().isEmpty()) {
+            KConfig globals = kdeutil::user(u"kdeglobals"_s);
+            KConfigGroup(&globals, u"General"_s).writeEntry("ColorScheme", scheme, kdeutil::Notify);
+            globals.sync();
+        }
+        Q_EMIT run(accentArgv);
     }
-    argv << scheme;
-    Q_EMIT run(argv);
     scheduleRead();
+}
+
+void AppearanceConfig::applyAccentOnceSchemeIs(const QString &scheme, const QStringList &argv, int generation, int tries)
+{
+    if (generation != m_schemeGeneration) {
+        return; // a newer choice replaced this one
+    }
+    if (userScheme() == scheme) {
+        Q_EMIT run(argv);
+        return;
+    }
+    if (tries > 0) {
+        QTimer::singleShot(200, this, [this, scheme, argv, generation, tries] {
+            applyAccentOnceSchemeIs(scheme, argv, generation, tries - 1);
+        });
+    }
 }
 
 void AppearanceConfig::switchThemeParts(bool dark)

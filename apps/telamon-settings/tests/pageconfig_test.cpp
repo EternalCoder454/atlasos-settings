@@ -56,6 +56,19 @@ QVariant value(const QString &file, const QString &group, const QString &key)
     return g.hasKey(key) ? QVariant(g.readEntry(key, QString())) : QVariant();
 }
 
+// What plasma-apply-colorscheme leaves in the user's kdeglobals, added to what
+// is there.
+void toolApplied(const QString &scheme, const QString &accent = QString())
+{
+    KConfig config(dir("config") + u"/kdeglobals"_s, KConfig::SimpleConfig);
+    KConfigGroup g(&config, u"General"_s);
+    g.writeEntry("ColorScheme", scheme);
+    if (!accent.isEmpty()) {
+        g.writeEntry("AccentColor", accent);
+    }
+    config.sync();
+}
+
 void clearUserFiles()
 {
     QDir(dir("config")).removeRecursively();
@@ -121,10 +134,15 @@ private Q_SLOTS:
         AppearanceConfig cfg;
         QSignalSpy run(&cfg, &AppearanceConfig::run);
         cfg.setDark(true);
+        // plasma-apply-colorscheme sets the scheme: alone, since with
+        // --accent-color it ignores the scheme and only re-tints the current
+        // one. The default accent of the new scheme follows once the scheme's
+        // name has landed in kdeglobals.
         QCOMPARE(run.size(), 1);
-        // plasma-apply-colorscheme sets the scheme (and with it the default
-        // accent of the scheme).
-        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#8a7af4"_s, u"TelamonDark"_s}));
+        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"TelamonDark"_s}));
+        toolApplied(u"TelamonDark"_s);
+        QTRY_COMPARE(run.size(), 2);
+        QCOMPARE(run.at(1).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#8a7af4"_s}));
         QCOMPARE(value(u"kdeglobals"_s, u"Icons"_s, u"Theme"_s).toString(), u"Papirus-Dark"_s);
         QCOMPARE(value(u"kwinrc"_s, u"org.kde.kdecoration2"_s, u"theme"_s).toString(), u"__aurorae__svg__Telamon-Dark"_s);
         // The library is the system's already: KConfig leaves a value equal to
@@ -147,19 +165,56 @@ private Q_SLOTS:
     {
         AppearanceConfig cfg;
         QSignalSpy run(&cfg, &AppearanceConfig::run);
+        // The AtlasOS-era name moves to the Telamon one (a call of its own),
+        // then the accent.
         cfg.setAccent(u"#E5487A"_s);
-        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#e5487a"_s, u"TelamonLight"_s}));
+        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"TelamonLight"_s}));
+        toolApplied(u"TelamonLight"_s);
+        QTRY_COMPARE(run.size(), 2);
+        QCOMPARE(run.at(1).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#e5487a"_s}));
         QCOMPARE(value(u"kdeglobals"_s, u"General"_s, u"accentColorFromWallpaper"_s).toString(), u"false"_s);
         // Not a colour: nothing happens.
         cfg.setAccent(u"red; rm -rf"_s);
-        QCOMPARE(run.size(), 1);
+        QCOMPARE(run.size(), 2);
         // The accent as the module writes it is read back.
         write(dir("config") + u"/kdeglobals"_s, "[General]\nColorScheme=AtlasOSLight\nAccentColor=229,72,122\n");
         QCOMPARE(cfg.read().value(u"accent"_s).toString(), u"#e5487a"_s);
         QCOMPARE(cfg.read().value(u"accentIsDefault"_s).toBool(), false);
         // A mode switch keeps it.
         cfg.setDark(true);
-        QCOMPARE(run.last().at(0).toStringList().at(2), u"#e5487a"_s);
+        toolApplied(u"TelamonDark"_s, u"229,72,122"_s);
+        QTRY_COMPARE(run.last().at(0).toStringList().at(2), u"#e5487a"_s);
+    }
+
+    void aSchemeInTheGlobalThemesDefaultsAloneIsWrittenToKdeglobals()
+    {
+        // The Global Theme keeps the name in kdedefaults; the user's kdeglobals
+        // has the colours but no ColorScheme. plasma-apply-colorscheme calls
+        // that scheme "already set" and writes nothing, so Settings writes the
+        // name (with a notification: gtkconfig and kvantum-sync follow it).
+        write(dir("config") + u"/kdedefaults/kdeglobals"_s, "[General]\nColorScheme=TelamonDark\n");
+        write(dir("config") + u"/kdeglobals"_s, "[Colors:Window]\nBackgroundNormal=33,30,56\n");
+        AppearanceConfig cfg;
+        QSignalSpy run(&cfg, &AppearanceConfig::run);
+        cfg.setDark(true);
+        QCOMPARE(value(u"kdeglobals"_s, u"General"_s, u"ColorScheme"_s).toString(), u"TelamonDark"_s);
+        QCOMPARE(run.size(), 1);
+        QCOMPARE(run.at(0).at(0).toStringList(), (QStringList{u"plasma-apply-colorscheme"_s, u"--accent-color"_s, u"#8a7af4"_s}));
+        // The colours stay.
+        QCOMPARE(value(u"kdeglobals"_s, u"Colors:Window"_s, u"BackgroundNormal"_s).toString(), u"33,30,56"_s);
+    }
+
+    void aNewerChoiceReplacesTheAccentStillWaiting()
+    {
+        AppearanceConfig cfg;
+        QSignalSpy run(&cfg, &AppearanceConfig::run);
+        cfg.setDark(true);  // waits for TelamonDark to land
+        cfg.setDark(false); // replaces it
+        toolApplied(u"TelamonDark"_s);
+        QTest::qWait(500);
+        for (const QList<QVariant> &r : run) {
+            QVERIFY2(!r.at(0).toStringList().contains(u"#8a7af4"_s), "the accent of the Dark choice that was replaced");
+        }
     }
 
     void accentFromWallpaperIsTheModulesKey()
