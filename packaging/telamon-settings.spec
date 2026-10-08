@@ -243,6 +243,11 @@ appstream-util validate-relax --nonet \
 - Accounts: the camera on the picture starts the camera app (Plasma Camera,
   else Kamoso or Snapshot) and offers to choose the picture it takes; with no
   camera app it opens Telamon Store at Snapshot.
+- Updates: the firmware part shows this computer's own firmware (BIOS/UEFI)
+  version and date, and never says "up to date" about firmware fwupd has no
+  release for: a maker that publishes nothing to fwupd gets a note and a button
+  to its support site (ASRock, ASUS, MSI, Gigabyte, Dell, Lenovo, HP,
+  Framework; else a web search).
 
 * Wed Oct 07 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.2-1
 - Light or Dark now changes the colour scheme. With an accent set (always, as

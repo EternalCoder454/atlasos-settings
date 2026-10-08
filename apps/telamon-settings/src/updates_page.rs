@@ -87,6 +87,15 @@ pub mod qobject {
         /// fwupd is on this system: the Firmware section shows (no section
         /// and no error when it is not).
         #[qproperty(bool, firmware_available, cxx_name = "firmwareAvailable")]
+        /// This computer's firmware (BIOS/UEFI) as JSON: `{vendor, version,
+        /// date}` (date `YYYY-MM-DD` or ""); "" when it has no version.
+        #[qproperty(QString, system_firmware_json, cxx_name = "systemFirmwareJson")]
+        /// What fwupd knows of that firmware, from the last check:
+        /// "upToDate" (it has releases and none is newer), "updateAvailable",
+        /// "noMetadata" (it has no release for it at all: the maker does not
+        /// publish to fwupd, so "up to date" can't be said) or "unknown" (also
+        /// before the first check).
+        #[qproperty(QString, system_firmware_verdict, cxx_name = "systemFirmwareVerdict")]
         /// The listing as JSON: `{updates, pending, note}` (firmware::View).
         #[qproperty(QString, firmware_json, cxx_name = "firmwareJson")]
         #[qproperty(bool, firmware_busy, cxx_name = "firmwareBusy")]
@@ -258,6 +267,7 @@ use serde_json::json;
 use settings_sys::Bus;
 use telamon_framework_system::bootc::{Channel, Status};
 
+use crate::system_firmware;
 use telamon_updater_core::base::fwupd;
 use telamon_updater_core::config::{self, Config};
 use telamon_updater_core::errors::{self, OpError};
@@ -316,6 +326,8 @@ pub struct UpdatesPageRust {
     apps_error: QString,
     apps_auto: bool,
     firmware_available: bool,
+    system_firmware_json: QString,
+    system_firmware_verdict: QString,
     firmware_json: QString,
     firmware_busy: bool,
     firmware_op: QString,
@@ -683,6 +695,24 @@ impl qobject::UpdatesPage {
             r.started = true;
             r.config = cfg;
             r.fixtures = fixtures;
+        }
+        // The computer's own firmware version, from the kernel's DMI files
+        // (fixture mode: the state's `dmi` folder, if it has one).
+        {
+            let dir = self
+                .rust()
+                .fixtures
+                .as_ref()
+                .map(|d| d.join("dmi"))
+                .unwrap_or_else(|| PathBuf::from(system_firmware::DMI_DIR));
+            let qt = self.qt_thread();
+            spawn_named("telamon-dmi", move || {
+                if let Some(f) = system_firmware::read(&dir) {
+                    let text = f.to_json();
+                    let _ =
+                        qt.queue(move |mut obj| obj.as_mut().set_system_firmware_json(q(&text)));
+                }
+            });
         }
         // Fixture mode: `last-checked` (Unix seconds), else never.
         let checked = match &self.rust().fixtures {
@@ -1536,7 +1566,34 @@ impl qobject::UpdatesPage {
                 None => run_async(firmware::list()),
             })
             .unwrap_or_else(|| Err(OpError::Message(INTERNAL.into())));
-            let _ = qt.queue(move |mut obj| obj.as_mut().firmware_listed(res, None));
+            // What fwupd knows of the computer's own firmware, so the page
+            // never says "up to date" about what it has no release for.
+            let verdict = match (&res, fixtures.as_deref()) {
+                (Ok(Some(_)), Some(d)) => config::read_fixture(d, "system-firmware-verdict")
+                    .map(|w| w.trim().to_string())
+                    .unwrap_or_else(|| "unknown".into()),
+                (Ok(Some(l)), None) => {
+                    let offered: Vec<String> =
+                        l.updates.iter().map(|u| u.device_id.clone()).collect();
+                    guarded(|| {
+                        run_async(async {
+                            let conn = zbus::Connection::system()
+                                .await
+                                .map_err(|e| OpError::Message(e.to_string()))?;
+                            Ok(system_firmware::ask_fwupd(&conn, &offered).await)
+                        })
+                    })
+                    .and_then(Result::ok)
+                    .unwrap_or(system_firmware::Verdict::Unknown)
+                    .word()
+                    .to_string()
+                }
+                _ => "unknown".into(),
+            };
+            let _ = qt.queue(move |mut obj| {
+                obj.as_mut().set_system_firmware_verdict(q(&verdict));
+                obj.as_mut().firmware_listed(res, None);
+            });
         }) {
             self.firmware_listed(
                 Err(OpError::Message("could not start a worker thread".into())),

@@ -44,6 +44,27 @@ SettingsPage {
             "pending": [],
             "note": ""
         })
+    // This computer's own firmware (BIOS/UEFI): {vendor, version, date, maker,
+    // model, supportUrl}, or no version when the kernel gave none.
+    readonly property var systemFirmware: {
+        try {
+            return JSON.parse(page.updates.systemFirmwareJson.length > 0 ? page.updates.systemFirmwareJson : "{}");
+        } catch (e) {
+            return {};
+        }
+    }
+    readonly property bool hasSystemFirmware: (page.systemFirmware.version ?? "") !== ""
+    // What fwupd knows of it: see UpdatesPage's systemFirmwareVerdict.
+    readonly property string firmwareVerdict: page.updates.systemFirmwareVerdict
+    readonly property bool supportUrlOk: String(page.systemFirmware.supportUrl ?? "").startsWith("https://")
+    readonly property bool noFirmwareMetadata: page.updates.firmwareAvailable && page.firmwareVerdict === "noMetadata"
+    // "Firmware: 11.02 (5 May 2025)"; the date is read as local noon so no
+    // time zone moves it to the day before.
+    readonly property string systemFirmwareTitle: {
+        const f = page.systemFirmware;
+        const date = (f.date ?? "") !== "" ? Dates.longDate(f.date + "T12:00:00") : "";
+        return date !== "" ? qsTr("Firmware: %1 (%2)").arg(f.version ?? "").arg(date) : qsTr("Firmware: %1").arg(f.version ?? "");
+    }
     readonly property bool installingFirmware: page.updates.firmwareBusy && page.updates.firmwareOp === "installFirmware"
     // Errors from these operations belong to the hero; the others (apps)
     // stay in their own section.
@@ -503,8 +524,18 @@ SettingsPage {
         objectName: "firmware"
         Layout.fillWidth: true
         title: qsTr("Firmware Updates")
-        visible: page.updates.firmwareAvailable
+        visible: page.updates.firmwareAvailable || page.hasSystemFirmware
 
+        // What this computer runs now. Not cut off: the title and the maker
+        // under it wrap.
+        SectionRow {
+            objectName: "system-firmware"
+            visible: page.hasSystemFirmware
+            iconName: "cpu"
+            title: page.systemFirmwareTitle
+            subtitle: page.systemFirmware.vendor ?? ""
+            Accessible.name: page.systemFirmwareTitle
+        }
         SectionRow {
             visible: page.updates.firmwareBusy
             title: page.installingFirmware ? (page.updates.firmwareStatus.length > 0 ? page.updates.firmwareStatus + (page.updates.firmwarePercent >= 0 ? " · " + page.updates.firmwarePercent + "%" : "") + "…" : qsTr("Installing firmware…")) : qsTr("Looking for firmware updates…")
@@ -516,10 +547,32 @@ SettingsPage {
             iconName: "dialog-error"
             title: page.updates.firmwareError
         }
+        // "Up to date" only when fwupd knows the latest release of this
+        // computer's firmware. Many makers don't publish theirs to fwupd, and
+        // then there is nothing to be up to date with.
+        readonly property bool quiet: page.updates.firmwareAvailable && !page.updates.firmwareBusy && page.firmware.updates.length === 0 && page.firmware.pending.length === 0 && page.updates.firmwareError.length === 0
         SectionRow {
-            visible: !page.updates.firmwareBusy && page.firmware.updates.length === 0 && page.firmware.pending.length === 0 && page.updates.firmwareError.length === 0
+            visible: firmwareSection.quiet && page.firmwareVerdict === "upToDate"
             iconName: "checkmark"
             title: qsTr("Firmware is up to date.")
+        }
+        SectionRow {
+            visible: firmwareSection.quiet && page.firmwareVerdict !== "upToDate" && page.firmwareVerdict !== "noMetadata"
+            iconName: "dialog-information"
+            title: qsTr("No firmware updates were found.")
+        }
+        SectionRow {
+            objectName: "no-firmware-metadata"
+            visible: page.noFirmwareMetadata && !page.updates.firmwareBusy
+            iconName: "dialog-information"
+            title: qsTr("Your PC's maker doesn't offer firmware updates through Telamon OS.")
+            subtitle: (page.systemFirmware.maker ?? "") !== "" ? qsTr("Check %1's support site for newer firmware.").arg(page.systemFirmware.maker) : qsTr("Check your PC maker's support site for newer firmware.")
+            SecondaryButton {
+                visible: page.supportUrlOk
+                text: (page.systemFirmware.maker ?? "") !== "" ? qsTr("Open %1 Support").arg(page.systemFirmware.maker) : qsTr("Search the Web")
+                Accessible.name: (page.systemFirmware.maker ?? "") !== "" ? qsTr("Open the %1 support site in the browser").arg(page.systemFirmware.maker) : qsTr("Search the web for firmware updates for this computer")
+                onClicked: Qt.openUrlExternally(page.systemFirmware.supportUrl)
+            }
         }
         SectionRow {
             visible: page.firmware.note.length > 0

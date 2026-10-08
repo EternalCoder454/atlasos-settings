@@ -427,6 +427,17 @@ KService on the C++ side, tested against a temporary `XDG_CONFIG_HOME`
   bare Flickable, which moves 28 to 38 px a wheel notch, unevenly; the
   dialogs whose lists can outgrow the window hold a `DialogScroll`, which
   gives it the pages' `Kirigami.WheelHandler` (60 px a notch).
+- **Firmware on the Updates page** has the computer's own firmware (BIOS or
+  UEFI) as its first row: vendor, version and date from the kernel's
+  `/sys/class/dmi/id/bios_*` (`src/system_firmware.rs`; untrusted text,
+  cleaned and capped; the date is SMBIOS `mm/dd/yyyy`). fwupd's list says what
+  can be updated, not what is up to date: after a check the backend asks
+  fwupd for the releases of its "System Firmware" device (`GetReleases`), and
+  "Firmware is up to date." shows only when there are releases and none is
+  newer. With none at all (`NothingToDo`: the maker doesn't publish to the
+  LVFS) the page says so and opens the maker's support site (`MAKERS` in that
+  file, from the DMI maker; else a web search for it); when fwupd can't say,
+  "No firmware updates were found.".
 - **Apps.** Default Apps are `~/.config/mimeapps.list` (`[Default
   Applications]`, `[Added Associations]`) for the file types a kind covers,
   chosen only among the apps KService offers for it; the terminal is
