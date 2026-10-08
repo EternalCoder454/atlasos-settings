@@ -23,14 +23,14 @@ SettingsPage {
 
     // The OS logo for the up-to-date state, if the icon theme has it.
     readonly property string logoIcon: osLogoProbe.valid ? osLogoProbe.source : (distroLogoProbe.valid ? "distributor-logo" : "checkmark")
-    Kirigami.Icon {
+    SettingsIcon {
         id: osLogoProbe
         visible: false
         width: 0
         height: 0
         source: page.updates.osLogo
     }
-    Kirigami.Icon {
+    SettingsIcon {
         id: distroLogoProbe
         visible: false
         width: 0

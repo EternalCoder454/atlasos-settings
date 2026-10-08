@@ -266,7 +266,7 @@ SettingsPage {
                     subtitle: startRow.modelData.comment
                     showSwitch: true
                     switchChecked: startRow.modelData.enabled
-                    leading: Kirigami.Icon {
+                    leading: SettingsIcon {
                         source: startRow.modelData.icon
                         implicitWidth: Kirigami.Units.iconSizes.medium
                         implicitHeight: Kirigami.Units.iconSizes.medium
@@ -337,7 +337,7 @@ SettingsPage {
                     title: appRow.modelData.name
                     subtitle: appRow.modelData.id
                     chevron: true
-                    leading: Kirigami.Icon {
+                    leading: SettingsIcon {
                         source: appRow.modelData.icon
                         implicitWidth: Kirigami.Units.iconSizes.medium
                         implicitHeight: Kirigami.Units.iconSizes.medium

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(telamon-settings VERSION 0.4.5 LANGUAGES CXX)
+project(telamon-settings VERSION 0.4.6 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -110,6 +110,7 @@ qt_add_qml_module(telamon-settings-app
         qml/icons/update-arrow.svg
     QML_FILES
         qml/Main.qml
+        qml/SettingsIcon.qml
         qml/PendingPage.qml
         qml/MoreSettingsPage.qml
         qml/SearchPage.qml

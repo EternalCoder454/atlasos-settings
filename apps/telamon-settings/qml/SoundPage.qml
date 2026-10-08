@@ -207,7 +207,7 @@ SettingsPage {
 
                 title: model.label
                 content: [
-                    Kirigami.Icon {
+                    SettingsIcon {
                         Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
                         Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
                         source: appRow.model.appIcon !== "" ? appRow.model.appIcon : "audio-volume-high-symbolic"
