@@ -70,8 +70,8 @@ SettingsPage {
     // stay in their own section.
     readonly property bool heroError: ["check", "download", "restart", "rollback", "cancelRollback", "switch", "status", "timer"].indexOf(page.updates.errorOp) >= 0
     readonly property bool retryable: ["check", "status", "download"].indexOf(page.updates.errorOp) >= 0
-    // A failed download is not retried while a restart waits (it could replace a queued rollback).
-    readonly property bool canRetry: page.hasError && page.retryable && !(page.updates.errorOp === "download" && page.restartReady)
+    // A failed download is not retried while a go back is queued (it could replace it). A staged update does not stop it: a download replaces the staged one.
+    readonly property bool canRetry: page.hasError && page.retryable && !(page.updates.errorOp === "download" && page.rollbackQueued)
     readonly property bool hasError: page.updates.errorText.length > 0 && page.heroError && page.updates.restarting !== true && (!page.updates.loaded || !page.updates.busy)
     // busyOp is only meaningful together with busy.
     readonly property string busyOp: page.updates.busy ? page.updates.busyOp : ""
@@ -84,6 +84,10 @@ SettingsPage {
     readonly property bool availableIsBad: page.updates.availableIsBad === true
     // Something is waiting for a restart (an update, a switch or a go back).
     readonly property bool restartReady: page.updates.hasStaged || page.updates.restartNeeded || page.rollbackQueued
+    // An update is staged and a newer one has been published since: downloading it replaces the staged one, so one restart starts the newest.
+    readonly property bool restage: page.updates.availableReplacesStaged === true && !page.rollbackQueued
+    // A staged update does not stop the search for a newer one; a queued go back does.
+    readonly property bool canCheck: !page.rollbackQueued && (!page.restartReady || page.updates.hasStaged)
     readonly property bool checking: (!page.updates.loaded && !page.hasError) || page.busyOp === "check"
     readonly property bool restarting: page.updates.restarting === true
 
@@ -184,7 +188,7 @@ SettingsPage {
             updates.checkFirmware();
         }
         // `telamon-settings updates check` (the tray's "Check for Updates").
-        if (itemId === "check" && !page.checking && !page.downloading && !page.working && !page.restartReady) {
+        if (itemId === "check" && !page.checking && !page.downloading && !page.working && page.canCheck) {
             page.check();
         }
     }
@@ -286,7 +290,7 @@ SettingsPage {
             if (page.rollbackQueued) {
                 return "edit-undo";
             }
-            if (page.restartReady) {
+            if (page.restartReady && !page.restage) {
                 return "system-reboot";
             }
             if (page.updates.updateAvailable && page.availableIsBad) {
@@ -316,7 +320,7 @@ SettingsPage {
             if (page.rollbackQueued) {
                 return qsTr("Restart to go back to %1").arg(page.updates.rollbackTarget);
             }
-            if (page.restartReady) {
+            if (page.restartReady && !page.restage) {
                 return qsTr("Restart to finish updating");
             }
             if (page.updates.updateAvailable && page.availableIsBad) {
@@ -338,6 +342,9 @@ SettingsPage {
                 return qsTr("Saving your session…");
             }
             if (page.downloading) {
+                if (page.updates.hasStaged) {
+                    return qsTr("Keep using your computer. It replaces the downloaded version %1 and starts when you restart.").arg(page.updates.stagedVersion);
+                }
                 return qsTr("Keep using your computer. The update is set up on the side and starts when you restart.");
             }
             if (page.checking || page.working) {
@@ -347,6 +354,9 @@ SettingsPage {
             var when = page.updates.scheduledAt > 0 ? " " + qsTr("Restart scheduled for %1.").arg(Dates.atTime(page.updates.scheduledAt)) : "";
             if (page.rollbackQueued) {
                 return qsTr("The previous version starts after the restart.") + when;
+            }
+            if (page.restage) {
+                return qsTr("Version %1 is downloaded. Download %2 first to restart into the newest version.").arg(page.updates.stagedVersion).arg(page.updates.availableVersion) + when;
             }
             if (page.updates.hasStaged) {
                 return qsTr("Version %1 is downloaded and waits for a restart.").arg(page.updates.stagedVersion) + when;
@@ -367,16 +377,31 @@ SettingsPage {
             return qsTr("Version %1. Updates download in the background.").arg(page.updates.currentVersion) + last;
         }
 
+        // With a newer version than the downloaded one, the download comes first.
+        PrimaryButton {
+            text: qsTr("Download Update")
+            visible: page.updates.updateAvailable && (!page.restartReady || page.restage) && !page.availableIsRollback && !page.availableIsBad && !page.hasError && !page.checking && !page.downloading
+            enabled: !page.updates.busy
+            onClicked: page.updates.downloadUpdate()
+        }
         PrimaryButton {
             text: page.restarting ? qsTr("Restarting System…") : (page.rollbackQueued ? qsTr("Restart Now") : qsTr("Restart to Update"))
-            visible: page.restartReady
+            visible: page.restartReady && !page.restage
+            enabled: !page.updates.busy && !page.working && !page.installingFirmware
+            onClicked: page.updates.restartNow()
+        }
+        // A newer version can be downloaded: restarting now starts the one that
+        // is already downloaded, and the button says which.
+        SecondaryButton {
+            text: page.restarting ? qsTr("Restarting System…") : qsTr("Restart to Install %1").arg(page.updates.stagedVersion)
+            visible: page.restage
             enabled: !page.updates.busy && !page.working && !page.installingFirmware
             onClicked: page.updates.restartNow()
         }
         SecondaryButton {
             id: tonightButton
             text: qsTr("Restart Tonight")
-            visible: page.restartReady && !page.working && page.updates.scheduledAt === 0 && page.tonight > 0
+            visible: page.restartReady && !page.restage && !page.working && page.updates.scheduledAt === 0 && page.tonight > 0
             enabled: !page.installingFirmware
             TelamonToolTip {
                 text: qsTr("Restarts at %1. You get a notification 5 minutes before.").arg(new Date(page.tonight * 1000).toLocaleTimeString(Qt.locale(), Qt.locale().timeFormat(1)))
@@ -392,7 +417,7 @@ SettingsPage {
         }
         SecondaryButton {
             text: qsTr("Pick a Time…")
-            visible: page.restartReady && !page.working && page.updates.scheduledAt === 0
+            visible: page.restartReady && !page.restage && !page.working && page.updates.scheduledAt === 0
             enabled: !page.installingFirmware
             onClicked: scheduleDialog.open()
         }
@@ -408,27 +433,22 @@ SettingsPage {
             enabled: !page.updates.busy
             onClicked: page.updates.cancelRollback()
         }
-        PrimaryButton {
-            text: qsTr("Download Update")
-            visible: page.updates.updateAvailable && !page.updates.hasStaged && !page.restartReady && !page.availableIsRollback && !page.availableIsBad && !page.hasError && !page.checking && !page.downloading
-            enabled: !page.updates.busy
-            onClicked: page.updates.downloadUpdate()
-        }
         SecondaryButton {
             text: qsTr("Download Anyway")
             visible: page.updates.updateAvailable && !page.updates.hasStaged && !page.restartReady && (page.availableIsRollback || page.availableIsBad) && !page.hasError && !page.checking && !page.downloading
             enabled: !page.updates.busy
             onClicked: page.availableIsBad ? badDialog.open() : page.updates.downloadUpdate()
         }
-        // One primary pill at most: with a restart waiting, Try again is secondary.
+        // One primary pill at most: with a restart waiting, Try again is secondary
+        // (unless the restart is the secondary one, as when a newer version is offered).
         PrimaryButton {
             text: qsTr("Try Again")
-            visible: page.canRetry && !page.restartReady
+            visible: page.canRetry && (!page.restartReady || page.restage)
             onClicked: page.retry()
         }
         SecondaryButton {
             text: qsTr("Try Again")
-            visible: page.canRetry && page.restartReady
+            visible: page.canRetry && page.restartReady && !page.restage
             onClicked: page.retry()
         }
         SecondaryButton {
@@ -445,7 +465,7 @@ SettingsPage {
         }
         SecondaryButton {
             text: qsTr("Check for Updates")
-            visible: !page.hasError && !page.restartReady && !page.checking && !page.downloading && !page.working
+            visible: !page.hasError && page.canCheck && !page.restage && !page.checking && !page.downloading && !page.working
             enabled: !page.updates.busy
             onClicked: page.check()
         }

@@ -56,6 +56,10 @@ pub mod qobject {
         #[qproperty(bool, update_available, cxx_name = "updateAvailable")]
         #[qproperty(QString, available_version, cxx_name = "availableVersion")]
         #[qproperty(QString, available_date, cxx_name = "availableDate")]
+        /// An update is staged and a newer image has been published since:
+        /// downloading it replaces the staged one, so one restart starts the
+        /// newest.
+        #[qproperty(bool, available_replaces_staged, cxx_name = "availableReplacesStaged")]
         #[qproperty(QString, channel, cxx_name = "channel")]
         #[qproperty(bool, restart_needed, cxx_name = "restartNeeded")]
         /// A rollback is queued for the next restart.
@@ -301,6 +305,7 @@ pub struct UpdatesPageRust {
     update_available: bool,
     available_version: QString,
     available_date: QString,
+    available_replaces_staged: bool,
     channel: QString,
     restart_needed: bool,
     rollback_queued: bool,
@@ -571,6 +576,24 @@ fn glow_wanted(busy: bool, busy_op: &str) -> bool {
         busy_op,
         "download" | "switch" | "rollback" | "cancelRollback"
     )
+}
+
+/// An update is staged and `available` is a newer image than the staged one,
+/// so downloading it replaces the staged one (`bootc upgrade` stages the newest
+/// image over it) and a single restart starts the newest. `available` is
+/// already never an older image than the booted or staged one
+/// ([`Status::available_update`]) and never the staged image itself. Not for
+/// an image that failed its boot checks here or the one the user went back from
+/// (those are never offered over a good staged update), nor with a rollback
+/// queued (a download could replace it). The same rule as
+/// `View::available_replaces_staged` in telamon-updater-core after the pin
+/// moves past it (the framework tag of that revision differs from this app's).
+fn available_replaces_staged(v: &View) -> bool {
+    v.available.present
+        && v.staged.present
+        && !v.rollback_queued
+        && !v.available_is_rollback
+        && !v.available_is_bad
 }
 
 fn q(s: &str) -> QString {
@@ -953,7 +976,12 @@ impl qobject::UpdatesPage {
                     // No banner where the Updates page's hero already
                     // shows the new state; it would say the same thing twice.
                     let msg = match op {
-                        Op::Check if v.staged.present || v.available.present => String::new(),
+                        Op::Check if v.available.present => String::new(),
+                        // the page still shows the staged update's restart
+                        Op::Check if v.staged.present => format!(
+                            "{} is the newest version. Restart to start it.",
+                            v.staged.version
+                        ),
                         Op::Check => "You are up to date.".to_string(),
                         Op::Upgrade if v.staged.present => String::new(),
                         Op::Upgrade => "No new update was downloaded.".to_string(),
@@ -1008,6 +1036,8 @@ impl qobject::UpdatesPage {
         self.as_mut().set_update_available(v.available.present);
         self.as_mut().set_available_version(q(&v.available.version));
         self.as_mut().set_available_date(q(&v.available.date));
+        self.as_mut()
+            .set_available_replaces_staged(available_replaces_staged(&v));
         self.as_mut().set_channel(q(&v.channel));
         self.as_mut().set_restart_needed(v.restart_needed);
         self.as_mut().set_rollback_queued(v.rollback_queued);
@@ -1047,7 +1077,9 @@ impl qobject::UpdatesPage {
             return;
         }
         let v = self.rust().view.clone();
-        let target = if v.staged.present {
+        // The notes of the version a restart will start, unless a newer one
+        // is about to replace it.
+        let target = if v.staged.present && !available_replaces_staged(&v) {
             v.staged.version.clone()
         } else if v.available.present {
             v.available.version.clone()
@@ -1894,6 +1926,99 @@ mod tests {
         ] {
             assert!(!glow_wanted(true, op), "{op}");
         }
+    }
+
+    /// A status with a staged image, optionally with `cached` found by the
+    /// last check (recorded on the booted entry here, as when the ref heads
+    /// can't be read), the rollback image, and whether a rollback is queued.
+    fn status_with(staged: &str, cached: &str, rollback: &str, queued: bool) -> Status {
+        let img = |v: &str| {
+            format!(
+                r#"{{"image":{{"image":"ghcr.io/e/atlasos:testing","transport":"registry"}},"version":"{v}","timestamp":"2026-10-08T00:00:00Z","imageDigest":"sha256:{v}"}}"#
+            )
+        };
+        let entry = |v: &str, cached: &str| {
+            if v.is_empty() {
+                return "null".to_string();
+            }
+            let cached = if cached.is_empty() {
+                "null".to_string()
+            } else {
+                img(cached)
+            };
+            format!(r#"{{"image":{},"cachedUpdate":{cached}}}"#, img(v))
+        };
+        Status::from_json(&format!(
+            r#"{{"apiVersion":"org.containers.bootc/v1","kind":"BootcHost",
+              "spec":{{"image":{{"image":"ghcr.io/e/atlasos:testing","transport":"registry"}}}},
+              "status":{{"staged":{},"booted":{},"rollback":{},"rollbackQueued":{queued},"type":"bootcHost"}}}}"#,
+            entry(staged, ""),
+            entry("44.20261008-1", cached),
+            entry(rollback, ""),
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_newer_image_over_the_staged_one_is_offered_and_replaces_it() {
+        // booted -1, -3 staged, -5 published and found by a check
+        let v = view::from_status(&status_with(
+            "44.20261008-3",
+            "44.20261008-5",
+            "44.20261007-7",
+            false,
+        ));
+        assert_eq!(v.staged.version, "44.20261008-3");
+        assert_eq!(v.available.version, "44.20261008-5");
+        assert!(available_replaces_staged(&v));
+    }
+
+    #[test]
+    fn nothing_newer_than_the_staged_image_is_just_a_restart() {
+        // the check found the staged image itself (the stale cachedUpdate of
+        // an earlier check) or nothing at all
+        for cached in ["44.20261008-3", ""] {
+            let v = view::from_status(&status_with(
+                "44.20261008-3",
+                cached,
+                "44.20261007-7",
+                false,
+            ));
+            assert!(v.staged.present && !v.available.present, "{cached:?}");
+            assert!(!available_replaces_staged(&v), "{cached:?}");
+        }
+    }
+
+    #[test]
+    fn an_older_image_never_replaces_the_staged_one() {
+        // the tag went back to -2 after -3 was staged: not an update
+        let v = view::from_status(&status_with(
+            "44.20261008-3",
+            "44.20261008-2",
+            "44.20261007-7",
+            false,
+        ));
+        assert!(!v.available.present);
+        assert!(!available_replaces_staged(&v));
+    }
+
+    #[test]
+    fn a_went_back_from_image_or_a_queued_rollback_is_not_a_replacement() {
+        // -5 is also the rollback image: the version the user went back from
+        let v = view::from_status(&status_with(
+            "44.20261008-3",
+            "44.20261008-5",
+            "44.20261008-5",
+            false,
+        ));
+        assert!(v.available_is_rollback && !available_replaces_staged(&v));
+        let v = view::from_status(&status_with(
+            "44.20261008-3",
+            "44.20261008-5",
+            "44.20261007-7",
+            true,
+        ));
+        assert!(!available_replaces_staged(&v));
     }
 
     #[test]
