@@ -11,7 +11,9 @@ Icon=net.eterneon.telamon.settings
 Terminal=false
 Categories=Qt;KDE;Settings;
 StartupNotify=true
-StartupWMClass=net.eterneon.telamon.settings
+# No StartupWMClass: Settings' window is net.eterneon.telamon.settings, the
+# name of the real desktop file. Naming it here too made Plasma match the window
+# to this hidden file, not to the dock pin, and show a second icon.
 SingleMainWindow=true
 X-KDE-StartupNotify=true
 NoDisplay=true

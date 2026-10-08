@@ -566,8 +566,12 @@ the `Obsoletes:` does that in the same transaction. The subpackage installs:
    (about 0.4 ms measured in a debug build, `tests/process.rs`).
 2. Hidden `systemsettings.desktop` and `kdesystemsettings.desktop` that
    launch Settings, so KCMLauncher keeps finding System Settings and old pins
-   keep working (`StartupWMClass` is Settings' own, so a window groups with
-   such a pin).
+   keep working. They carry no `StartupWMClass`: the window's app id is
+   `net.eterneon.telamon.settings`, the real desktop file's own name, and a
+   second file claiming it as its window class makes Plasma's task manager
+   match the window to the hidden one instead of the dock pin, so Settings
+   showed up as a second icon. (An old pin on one of the hidden files
+   starts Settings but no longer groups with its window.)
 
 System Settings' global shortcut, Meta+I (and the Tools key), moves to
 Settings: its desktop file carries `X-KDE-Shortcuts` and a copy is installed
