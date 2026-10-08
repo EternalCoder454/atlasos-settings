@@ -78,7 +78,7 @@ bool Launcher::run(const QStringList &argv)
 
 QString Launcher::runApplication(const QStringList &desktopNames)
 {
-    static const QRegularExpression plainId(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"));
+    static const QRegularExpression plainId(QStringLiteral("\\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\z"));
     for (const QString &name : desktopNames) {
         if (!plainId.match(name).hasMatch()) {
             continue;
@@ -89,7 +89,9 @@ QString Launcher::runApplication(const QStringList &desktopNames)
         }
         const QStringList key{QStringLiteral("desktop:") + name};
         if (!allowed(key, name)) {
-            return name;
+            // A repeat within 2 s: the first start is still on its way. Over
+            // the limit: failed() was emitted, and nothing started.
+            return m_last == key ? name : QString();
         }
         recordStart(key);
         auto *job = new KIO::ApplicationLauncherJob(service, this);

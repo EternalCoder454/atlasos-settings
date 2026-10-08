@@ -296,19 +296,50 @@ pub enum Releases {
     Failed,
 }
 
-/// The decision. `device` is whether fwupd lists the system firmware,
-/// `offered` whether its check found a newer release for it.
-pub fn verdict(device: bool, offered: bool, releases: Releases) -> Verdict {
-    if !device {
+/// What `GetUpgrades` for the device answered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Upgrades {
+    /// At least one newer release.
+    Offered,
+    /// `NothingToDo` or `NotSupported`: fwupd has none newer.
+    None,
+    /// Any other error, or no answer.
+    Failed,
+}
+
+/// Whether fwupd can see and update the device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceState {
+    /// fwupd lists no system firmware.
+    Missing,
+    /// Listed but not updatable (blocked, locked or hidden): fwupd's list
+    /// says nothing about whether it is current.
+    Unavailable,
+    Updatable,
+}
+
+/// The decision. "Up to date" needs fwupd to know releases for the device
+/// and to offer none newer; "the maker publishes nothing" needs no release
+/// at all while the metadata of an enabled remote is there (`metadata`), so a
+/// fresh install or a PC offline is not blamed on the maker.
+pub fn verdict(
+    device: DeviceState,
+    upgrades: Upgrades,
+    releases: Releases,
+    metadata: bool,
+) -> Verdict {
+    if device != DeviceState::Updatable {
         return Verdict::Unknown;
     }
-    if offered {
-        return Verdict::UpdateAvailable;
+    match upgrades {
+        Upgrades::Offered => return Verdict::UpdateAvailable,
+        Upgrades::Failed => return Verdict::Unknown,
+        Upgrades::None => {}
     }
     match releases {
         Releases::Found(n) if n > 0 => Verdict::UpToDate,
-        Releases::Found(_) | Releases::NothingToDo => Verdict::NoMetadata,
-        Releases::Failed => Verdict::Unknown,
+        Releases::Found(_) | Releases::NothingToDo if metadata => Verdict::NoMetadata,
+        _ => Verdict::Unknown,
     }
 }
 
@@ -331,6 +362,20 @@ fn text<'a>(d: &'a Dict, k: &str) -> Option<&'a str> {
     }
 }
 
+fn bit(flags: u64, n: u32) -> bool {
+    flags & (1u64 << n) != 0
+}
+
+fn number(d: &Dict, k: &str) -> Option<u64> {
+    match plain(d, k)? {
+        Value::U8(n) => Some(u64::from(*n)),
+        Value::U16(n) => Some(u64::from(*n)),
+        Value::U32(n) => Some(u64::from(*n)),
+        Value::U64(n) => Some(*n),
+        _ => None,
+    }
+}
+
 /// Whether a `GetDevices` row is the computer's own firmware: fwupd's UEFI
 /// capsule device (plugin `uefi_capsule`, the host firmware's), or a device
 /// that calls itself "System Firmware" with the computer icon.
@@ -343,6 +388,25 @@ pub fn is_system_firmware(d: &Dict) -> bool {
         || (text(d, "Name") == Some("System Firmware") && icon_computer)
 }
 
+/// The row for the system firmware among `GetDevices`' rows: one called
+/// "System Firmware" first, else the first of the plugin's.
+pub fn pick_device(rows: &[Dict]) -> Option<&Dict> {
+    let mut all = rows
+        .iter()
+        .filter(|d| is_system_firmware(d) && device_id(d).is_some());
+    let first = all.next()?;
+    if text(first, "Name") == Some("System Firmware") {
+        return Some(first);
+    }
+    rows.iter()
+        .find(|d| {
+            is_system_firmware(d)
+                && device_id(d).is_some()
+                && text(d, "Name") == Some("System Firmware")
+        })
+        .or(Some(first))
+}
+
 /// The device ID of a `GetDevices` row, if it is one fwupd could be asked about.
 pub fn device_id(d: &Dict) -> Option<&str> {
     text(d, "DeviceId").filter(|id| {
@@ -350,15 +414,39 @@ pub fn device_id(d: &Dict) -> Option<&str> {
     })
 }
 
+/// Whether fwupd can update the device now: the updatable flag (bit 1), and
+/// neither locked (bit 4) nor hidden (bit 37).
+pub fn device_state(d: &Dict) -> DeviceState {
+    let flags = number(d, "Flags").unwrap_or(0);
+    if bit(flags, 1) && !bit(flags, 4) && !bit(flags, 37) {
+        DeviceState::Updatable
+    } else {
+        DeviceState::Unavailable
+    }
+}
+
+/// Whether an enabled download remote has metadata (it was downloaded: a
+/// modification time), from `GetRemotes`' rows.
+pub fn has_metadata(remotes: &[Dict]) -> bool {
+    remotes.iter().any(|r| {
+        matches!(plain(r, "Enabled"), Some(Value::Bool(true)))
+            && number(r, "Type") == Some(1)
+            && number(r, "ModificationTime").is_some_and(|t| t > 0 && t != u64::MAX)
+    })
+}
+
 /// Asks fwupd (on `conn`, the system bus) about the system firmware.
-/// `offered` are the device IDs a check found updates for.
-pub async fn ask_fwupd(conn: &zbus::Connection, offered: &[String]) -> Verdict {
+pub async fn ask_fwupd(conn: &zbus::Connection) -> Verdict {
     const WAIT: Duration = Duration::from_secs(15);
     async fn bounded<T>(
         f: impl std::future::Future<Output = zbus::Result<T>>,
     ) -> Option<zbus::Result<T>> {
         tokio::time::timeout(WAIT, f).await.ok()
     }
+    let nothing = |e: &zbus::Error| {
+        matches!(e, zbus::Error::MethodError(n, _, _)
+            if matches!(n.as_str(), "org.freedesktop.fwupd.NothingToDo" | "org.freedesktop.fwupd.NotSupported"))
+    };
     let Ok(builder) = zbus::proxy::Builder::<zbus::Proxy>::new(conn)
         .destination("org.freedesktop.fwupd")
         .and_then(|b| b.path("/"))
@@ -373,13 +461,21 @@ pub async fn ask_fwupd(conn: &zbus::Connection, offered: &[String]) -> Verdict {
     let Some(Ok(rows)) = bounded(p.call::<_, _, Vec<Dict>>("GetDevices", &())).await else {
         return Verdict::Unknown;
     };
-    let Some(id) = rows
-        .iter()
-        .filter(|d| is_system_firmware(d))
-        .find_map(device_id)
-        .map(str::to_string)
+    let Some((id, state)) =
+        pick_device(&rows).and_then(|d| Some((device_id(d)?.to_string(), device_state(d))))
     else {
-        return verdict(false, false, Releases::Failed);
+        return verdict(
+            DeviceState::Missing,
+            Upgrades::Failed,
+            Releases::Failed,
+            false,
+        );
+    };
+    let upgrades = match bounded(p.call::<_, _, Vec<Dict>>("GetUpgrades", &(id.as_str(),))).await {
+        Some(Ok(r)) if !r.is_empty() => Upgrades::Offered,
+        Some(Ok(_)) => Upgrades::None,
+        Some(Err(e)) if nothing(&e) => Upgrades::None,
+        _ => Upgrades::Failed,
     };
     let releases = match bounded(p.call::<_, _, Vec<Dict>>("GetReleases", &(id.as_str(),))).await {
         Some(Ok(r)) => Releases::Found(r.len()),
@@ -390,7 +486,11 @@ pub async fn ask_fwupd(conn: &zbus::Connection, offered: &[String]) -> Verdict {
         }
         _ => Releases::Failed,
     };
-    verdict(true, offered.contains(&id), releases)
+    let metadata = match bounded(p.call::<_, _, Vec<Dict>>("GetRemotes", &())).await {
+        Some(Ok(r)) => has_metadata(&r),
+        _ => false,
+    };
+    verdict(state, upgrades, releases, metadata)
 }
 
 #[cfg(test)]
@@ -592,24 +692,107 @@ mod tests {
 
     #[test]
     fn the_decision_is_honest_about_what_fwupd_knows() {
+        use DeviceState::*;
         use Releases::*;
+        use Upgrades::{Failed as UpFailed, None as NoneNewer, Offered};
         use Verdict::*;
         // up to date only when fwupd has releases and offers none newer
-        assert_eq!(verdict(true, false, Found(3)), UpToDate);
-        assert_eq!(verdict(true, false, Found(1)), UpToDate);
+        assert_eq!(verdict(Updatable, NoneNewer, Found(3), true), UpToDate);
+        assert_eq!(verdict(Updatable, NoneNewer, Found(1), false), UpToDate);
         // an update wins over everything
-        assert_eq!(verdict(true, true, Found(3)), UpdateAvailable);
-        assert_eq!(verdict(true, true, NothingToDo), UpdateAvailable);
-        // the owner's ASRock: listed, updatable, no releases in any remote
-        assert_eq!(verdict(true, false, NothingToDo), NoMetadata);
-        assert_eq!(verdict(true, false, Found(0)), NoMetadata);
-        // could not tell
-        assert_eq!(verdict(true, false, Failed), Unknown);
-        assert_eq!(verdict(false, false, Found(5)), Unknown);
-        assert_eq!(verdict(false, true, NothingToDo), Unknown);
+        assert_eq!(verdict(Updatable, Offered, Found(3), true), UpdateAvailable);
+        assert_eq!(
+            verdict(Updatable, Offered, NothingToDo, false),
+            UpdateAvailable
+        );
+        // the owner's ASRock: listed, updatable, metadata downloaded, no release for it
+        assert_eq!(verdict(Updatable, NoneNewer, NothingToDo, true), NoMetadata);
+        assert_eq!(verdict(Updatable, NoneNewer, Found(0), true), NoMetadata);
+        // no metadata downloaded at all (fresh install, offline): not the maker's doing
+        assert_eq!(verdict(Updatable, NoneNewer, NothingToDo, false), Unknown);
+        // newer releases exist but the device can't be updated: not "up to date"
+        assert_eq!(verdict(Unavailable, NoneNewer, Found(5), true), Unknown);
+        assert_eq!(verdict(Missing, NoneNewer, Found(5), true), Unknown);
+        // an error asking for the upgrades or the releases
+        assert_eq!(verdict(Updatable, UpFailed, Found(5), true), Unknown);
+        assert_eq!(verdict(Updatable, NoneNewer, Failed, true), Unknown);
         for v in [UpToDate, UpdateAvailable, NoMetadata, Unknown] {
             assert!(!v.word().is_empty());
         }
+    }
+
+    #[test]
+    fn what_fwupd_says_of_a_device_and_the_remotes() {
+        let s = |t: &str| Value::from(t.to_string());
+        let dev = |flags: u64| dict(&[("Flags", Value::from(flags)), ("DeviceId", s("abc"))]);
+        assert_eq!(device_state(&dev(1 << 1)), DeviceState::Updatable);
+        assert_eq!(
+            device_state(&dev((1 << 1) | (1 << 8))),
+            DeviceState::Updatable
+        );
+        assert_eq!(device_state(&dev(0)), DeviceState::Unavailable);
+        assert_eq!(
+            device_state(&dev((1 << 1) | (1 << 4))),
+            DeviceState::Unavailable,
+            "locked"
+        );
+        assert_eq!(
+            device_state(&dev((1 << 1) | (1 << 37))),
+            DeviceState::Unavailable,
+            "hidden"
+        );
+        assert_eq!(device_state(&dict(&[])), DeviceState::Unavailable);
+        let remote = |enabled: bool, kind: u32, time: u64| {
+            dict(&[
+                ("Enabled", Value::from(enabled)),
+                ("Type", Value::from(kind)),
+                ("ModificationTime", Value::from(time)),
+            ])
+        };
+        assert!(has_metadata(&[remote(true, 1, 1_790_000_000)]));
+        assert!(has_metadata(&[
+            remote(false, 1, 1_790_000_000),
+            remote(true, 1, 5)
+        ]));
+        assert!(!has_metadata(&[]));
+        assert!(
+            !has_metadata(&[remote(false, 1, 1_790_000_000)]),
+            "disabled"
+        );
+        assert!(
+            !has_metadata(&[remote(true, 2, 1_790_000_000)]),
+            "a local remote"
+        );
+        assert!(!has_metadata(&[remote(true, 1, 0)]), "never downloaded");
+        assert!(!has_metadata(&[remote(true, 1, u64::MAX)]));
+    }
+
+    #[test]
+    fn the_system_firmware_row_is_the_one_called_that() {
+        let s = |t: &str| Value::from(t.to_string());
+        let other = dict(&[
+            ("Name", s("Dock Firmware")),
+            ("Plugin", s("uefi_capsule")),
+            ("DeviceId", s("aaa111")),
+        ]);
+        let sys = dict(&[
+            ("Name", s("System Firmware")),
+            ("Plugin", s("uefi_capsule")),
+            ("DeviceId", s("bbb222")),
+        ]);
+        let rows = [other.clone(), sys.clone()];
+        assert_eq!(pick_device(&rows).and_then(device_id), Some("bbb222"));
+        // with no row of that name, the plugin's first
+        assert_eq!(pick_device(&[other]).and_then(device_id), Some("aaa111"));
+        assert!(pick_device(&[]).is_none());
+        assert!(
+            pick_device(&[dict(&[
+                ("Name", s("SSD")),
+                ("Plugin", s("nvme")),
+                ("DeviceId", s("ccc333"))
+            ])])
+            .is_none()
+        );
     }
 
     #[test]

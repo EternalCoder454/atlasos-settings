@@ -28,7 +28,7 @@ public:
     // file through KIO's ApplicationLauncherJob: the file's own Exec line, no
     // shell, Flatpaks and all. Returns the name that was started, or "" when
     // none is installed (nothing is started and failed() is not emitted; the
-    // caller says so). A name that is not a plain desktop file ID is skipped.
+    // caller says so) or the start was refused for the limits (failed() is). A name that is not a plain desktop file ID is skipped.
     // Counts against the same limits as run().
     Q_INVOKABLE QString runApplication(const QStringList &desktopNames);
 

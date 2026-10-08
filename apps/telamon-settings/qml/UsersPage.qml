@@ -34,14 +34,26 @@ SettingsPage {
     // The camera apps, by desktop file ID: Camera (Plasma Camera, which the
     // image ships), then ones people may have added.
     readonly property var cameraApps: ["org.kde.plasma.camera", "org.kde.kamoso", "org.gnome.Snapshot", "org.gnome.Cheese"]
-    // "": nothing asked; "open": a camera app was started; "missing": none installed.
+    // "": nothing asked; "open": a camera app was started; "missing": none
+    // installed; "failed": it could not be started.
     property string cameraState: ""
 
     // Starts the camera app to take a picture. Camera saves into Pictures,
     // where "Choose the Picture" then looks.
     function openCamera() {
+        // failed() (too many windows, a program that won't start) sets
+        // "failed" while it runs: Main shows why, and no banner claims more.
+        page.cameraState = "";
         const started = page.launcher ? page.launcher.runApplication(page.cameraApps) : "";
-        page.cameraState = started !== "" ? "open" : "missing";
+        if (page.cameraState === "")
+            page.cameraState = started !== "" ? "open" : "missing";
+    }
+
+    Connections {
+        target: page.launcher
+        function onFailed() {
+            page.cameraState = "failed";
+        }
     }
 
     function choosePicture(fromCamera: bool) {

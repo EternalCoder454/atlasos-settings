@@ -88,7 +88,8 @@ pub mod qobject {
         /// and no error when it is not).
         #[qproperty(bool, firmware_available, cxx_name = "firmwareAvailable")]
         /// This computer's firmware (BIOS/UEFI) as JSON: `{vendor, version,
-        /// date}` (date `YYYY-MM-DD` or ""); "" when it has no version.
+        /// date, maker, model, supportUrl}` (date `YYYY-MM-DD` or ""); "" when
+        /// it has no version.
         #[qproperty(QString, system_firmware_json, cxx_name = "systemFirmwareJson")]
         /// What fwupd knows of that firmware, from the last check:
         /// "upToDate" (it has releases and none is newer), "updateAvailable",
@@ -1572,22 +1573,18 @@ impl qobject::UpdatesPage {
                 (Ok(Some(_)), Some(d)) => config::read_fixture(d, "system-firmware-verdict")
                     .map(|w| w.trim().to_string())
                     .unwrap_or_else(|| "unknown".into()),
-                (Ok(Some(l)), None) => {
-                    let offered: Vec<String> =
-                        l.updates.iter().map(|u| u.device_id.clone()).collect();
-                    guarded(|| {
-                        run_async(async {
-                            let conn = zbus::Connection::system()
-                                .await
-                                .map_err(|e| OpError::Message(e.to_string()))?;
-                            Ok(system_firmware::ask_fwupd(&conn, &offered).await)
-                        })
+                (Ok(Some(_)), None) => guarded(|| {
+                    run_async(async {
+                        let conn = zbus::Connection::system()
+                            .await
+                            .map_err(|e| OpError::Message(e.to_string()))?;
+                        Ok(system_firmware::ask_fwupd(&conn).await)
                     })
-                    .and_then(Result::ok)
-                    .unwrap_or(system_firmware::Verdict::Unknown)
-                    .word()
-                    .to_string()
-                }
+                })
+                .and_then(Result::ok)
+                .unwrap_or(system_firmware::Verdict::Unknown)
+                .word()
+                .to_string(),
                 _ => "unknown".into(),
             };
             let _ = qt.queue(move |mut obj| {

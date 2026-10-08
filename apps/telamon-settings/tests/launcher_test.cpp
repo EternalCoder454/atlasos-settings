@@ -41,6 +41,11 @@ private Q_SLOTS:
         QVERIFY(desktop.open(QIODevice::WriteOnly));
         desktop.write("[Desktop Entry]\nType=Application\nName=Test Camera\nExec=/bin/sh -c 'echo x >> " + m_marker.toUtf8() + "'\n");
         desktop.close();
+        for (int i = 0; i < 6; ++i) {
+            QFile app(m_home.path() + u"/applications/net.eterneon.test.many%1.desktop"_s.arg(i));
+            QVERIFY(app.open(QIODevice::WriteOnly));
+            app.write("[Desktop Entry]\nType=Application\nName=Many\nExec=/bin/true\n");
+        }
         // A link, not an application.
         QFile link(m_home.path() + u"/applications/net.eterneon.test.link.desktop"_s);
         QVERIFY(link.open(QIODevice::WriteOnly));
@@ -73,6 +78,19 @@ private Q_SLOTS:
         QCOMPARE(launcher.runApplication({u"net.eterneon.test.camera"_s}), u"net.eterneon.test.camera"_s);
         QTest::qWait(500);
         QCOMPARE(markerLines(), 1);
+    }
+
+    void tooManyStartsAreRefusedAndNotReportedAsStarted()
+    {
+        Launcher launcher;
+        QSignalSpy failed(&launcher, &Launcher::failed);
+        for (int i = 0; i < 5; ++i) {
+            const QString name = u"net.eterneon.test.many%1"_s.arg(i);
+            QCOMPARE(launcher.runApplication({name}), name);
+        }
+        QCOMPARE(failed.count(), 0);
+        QCOMPARE(launcher.runApplication({u"net.eterneon.test.many5"_s}), QString());
+        QCOMPARE(failed.count(), 1);
     }
 };
 
