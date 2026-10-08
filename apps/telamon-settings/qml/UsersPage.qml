@@ -222,9 +222,10 @@ SettingsPage {
                     gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: page.openCamera()
                 }
-                QQC2.ToolTip.visible: cameraHover.hovered
-                QQC2.ToolTip.text: qsTr("Take a Picture")
-                QQC2.ToolTip.delay: 600
+                TelamonToolTip {
+                    text: qsTr("Take a Picture")
+                    shown: cameraHover.hovered || cameraButton.activeFocus
+                }
             }
             HoverHandler {
                 id: hover
