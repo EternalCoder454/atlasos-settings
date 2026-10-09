@@ -49,7 +49,7 @@ Entry points, all on the session bus or the command line:
 
 | Entry | Who can call it | What it can ask for |
 |---|---|---|
-| `net.eterneon.telamon.settings` `org.freedesktop.Application.Activate` / `Open` | any session process | raise the window (`Open` ignores the URIs) |
+| `net.eterneon.telamon.settings` `org.freedesktop.Application.Activate` / `Open` | any session process | raise the window (`Activate`); `Open` has no handler: no document is ever opened |
 | `...Application.ActivateAction("open", [link])` | any session process | a **page and setting of the registry**, nothing else |
 | `...Application.ActivateAction("open-app", [id])` | any session process | the Apps page at App Permissions |
 | `org.kde.KDBusService.CommandLine(args)` | any session process; this is how a second `telamon-settings ...` start reaches the first | what the command line can: a page, a setting, a search, a KCM by name |
@@ -298,7 +298,9 @@ pinned by commit). Settings' part: it passes only values it was shown.
   `scripts/check-hardening.sh`, run by `%check` on both programs, reads the ELF
   files back and fails the package build without PIE, `GNU_RELRO` with
   `BIND_NOW`, a non-executable stack, no RPATH/RUNPATH/TEXTREL, and (for the
-  C++ program) stack protectors and the absence of the tests' hooks. *Not
+  C++ program) stack protectors and the absence of the tests' hooks. CI tests the check itself
+  (`scripts/test-check-hardening.sh`) against programs built with and without
+  each protection, and `annocheck` agrees with it on the RPM. *Not
   met:* Intel CET's IBT marking. The C++ is built with `-fcf-protection`,
   but rustc has no stable switch for it and the linker marks a program only if
   every object in it is marked, so both programs carry the shadow stack mark

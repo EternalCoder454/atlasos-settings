@@ -55,7 +55,7 @@ bad() {
 
 for f in "$@"; do
     [ -f "$f" ] || { bad "$f" "not a file"; continue; }
-    header=$(readelf -hW "$f")
+    header=$(readelf -hW "$f" 2>/dev/null) || { bad "$f" "not an ELF file"; continue; }
     segments=$(readelf -lW "$f")
     dynamic=$(readelf -dW "$f" 2>/dev/null || true)
 

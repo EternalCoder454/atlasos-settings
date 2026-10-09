@@ -149,6 +149,10 @@ jobs:
       # links, the systemsettings command line) with far more random and
       # option-shaped input than a local run uses (docs/SECURITY.md). A failure
       # prints the input that broke the rule.
+      # The hardening check that the RPM build runs on the finished programs,
+      # against small programs with and without the hardening.
+      - name: Hardening check self-test
+        run: scripts/test-check-hardening.sh
       - name: Parser property tests, long run
         timeout-minutes: 10
         env:
