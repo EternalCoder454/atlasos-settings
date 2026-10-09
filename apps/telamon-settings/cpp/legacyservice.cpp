@@ -1,5 +1,7 @@
 #include "legacyservice.h"
 
+#include "actionparam.h"
+
 #include <QDBusConnection>
 #include <QDBusError>
 #include <QDBusVariant>
@@ -46,16 +48,8 @@ void LegacyService::Open(const QStringList &, const QVariantMap &platformData)
 void LegacyService::ActivateAction(const QString &actionName, const QVariantList &parameter, const QVariantMap &platformData)
 {
     // "open" with a link such as "displays" or "network/wifi" (the Launcher's
-    // deep link); anything else only raises the window.
-    QStringList arguments;
-    if (actionName == QLatin1String("open") && parameter.size() == 1) {
-        QVariant value = parameter.first();
-        if (value.canConvert<QDBusVariant>()) {
-            value = qvariant_cast<QDBusVariant>(value).variant();
-        }
-        if (value.metaType().id() == QMetaType::QString) {
-            arguments = value.toString().replace(QLatin1Char('/'), QLatin1Char(' ')).split(QLatin1Char(' '), Qt::SkipEmptyParts);
-        }
-    }
-    Q_EMIT activateRequested(arguments, tokenOf(platformData));
+    // deep link), "open-app" with a desktop file ID; anything else only
+    // raises the window. Which of them is well formed is read in Rust, as for
+    // the new name; nothing is split or interpreted here.
+    Q_EMIT activateActionRequested(actionName, actionParameter(QVariant(parameter)), tokenOf(platformData));
 }

@@ -128,15 +128,26 @@ int main(int argc, char *argv[])
     // The name this program had (net.eterneon.atlas.settings) still answers
     // org.freedesktop.Application for the Launcher and other programs that
     // have not moved to the new one; dropped in the release after this one.
-    // The calls come to the same place; the arguments have no program name,
-    // which activate() skips, so it is put in front.
+    // The calls come to the same place as the new name's: a plain activation
+    // raises the window, and ActivateAction goes through the same reader of
+    // actions (launch.rs, action_args), so a caller of the old name can ask
+    // for nothing the new name would refuse.
     LegacyService legacy;
     QObject::connect(&legacy, &LegacyService::activateRequested, backend.get(), [e = engine.get(), b = backend.get()](const QStringList &arguments, const QString &token) {
         if (!token.isEmpty()) {
             KWindowSystem::setCurrentXdgActivationToken(token);
         }
         raise(e);
+        // The arguments have no program name, which activate() skips, so it
+        // is put in front.
         activate(b, QStringList{QStringLiteral("telamon-settings")} + arguments);
+    });
+    QObject::connect(&legacy, &LegacyService::activateActionRequested, backend.get(), [e = engine.get(), b = backend.get()](const QString &action, const QString &parameter, const QString &token) {
+        if (!token.isEmpty()) {
+            KWindowSystem::setCurrentXdgActivationToken(token);
+        }
+        raise(e);
+        activateAction(b, action, parameter);
     });
     legacy.registerOnSessionBus();
     activate(backend.get(), QCoreApplication::arguments());
