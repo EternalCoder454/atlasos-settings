@@ -24,6 +24,8 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <sys/stat.h>
+
 using namespace Qt::StringLiterals;
 
 namespace
@@ -108,6 +110,11 @@ private Q_SLOTS:
         write(dir("sys") + u"/wallpapers/AtlasOS/contents/screenshot.jpg"_s, "x");
         write(dir("sys") + u"/wallpapers/AtlasOS-Login/contents/screenshot.jpg"_s, "x");
         write(dir("sys") + u"/wallpapers/Bad'Name/contents/screenshot.jpg"_s, "x");
+        // Folders named like an option, a path or with a line break in them.
+        write(dir("sys") + u"/wallpapers/--help/contents/screenshot.jpg"_s, "x");
+        write(dir("sys") + u"/wallpapers/-x/contents/screenshot.jpg"_s, "x");
+        write(dir("sys") + u"/wallpapers/.hidden/contents/screenshot.jpg"_s, "x");
+        write(dir("sys") + u"/wallpapers/Two\nLines/contents/screenshot.jpg"_s, "x");
         write(dir("sys") + u"/plasma/look-and-feel/org.atlasos.dark.desktop/metadata.json"_s, R"({"KPlugin": {"Id": "org.atlasos.dark.desktop", "Name": "AtlasOS Dark", "Description": "d"}})");
         write(dir("sys") + u"/plasma/look-and-feel/org.evil.desktop/metadata.json"_s, R"({"KPlugin": {"Id": "../../etc", "Name": "x"}})");
         write(dir("pictures") + u"/photo.jpg"_s, "x");
@@ -253,6 +260,14 @@ private Q_SLOTS:
         QCOMPARE(run.last().at(0).toStringList().last(), u"TelamonDark"_s);
     }
 
+    void colorsAreCheckedToTheEnd()
+    {
+        QVERIFY(AppearanceConfig::validColor(u"#6858e2"_s));
+        QVERIFY(!AppearanceConfig::validColor(u"#6858e2\n"_s));
+        QVERIFY(!AppearanceConfig::validColor(u"#6858e2 "_s));
+        QVERIFY(!AppearanceConfig::validColor(u"#6858e"_s));
+    }
+
     void wallpapersOnlyKnownOnes()
     {
         AppearanceConfig cfg;
@@ -267,6 +282,14 @@ private Q_SLOTS:
         // offered.
         QVERIFY(!ids.contains(u"AtlasOS-Login"_s));
         QVERIFY(!ids.contains(u"Bad'Name"_s));
+        // ... nor are names a tool could read as an option, or that end in a
+        // line break (a regular expression's $ would have let that through).
+        for (const QString &bad : {u"--help"_s, u"-x"_s, u".hidden"_s, u"Two\nLines"_s, u"AtlasOS\n"_s}) {
+            QVERIFY2(!ids.contains(bad), qPrintable(bad));
+        }
+        for (const QString &id : ids) {
+            QVERIFY2(!id.startsWith(u'-'), qPrintable(id));
+        }
         QVERIFY(!ids.contains(dir("pictures") + u"/it's.jpg"_s));
         QCOMPARE(list.first().toMap().value(u"name"_s).toString(), u"AtlasOS Wave"_s);
 
@@ -367,6 +390,27 @@ private Q_SLOTS:
             QVERIFY2(changed.wait(3000), "no change announced");
             changed.clear();
         }
+    }
+
+    // metadata.json that is a link to /dev/zero (size 0, never ends) or a pipe
+    // (open waits for a writer) is skipped, not read.
+    void plantedMetadataIsNotRead()
+    {
+        const QString root = dir("sys") + u"/plasma/look-and-feel"_s;
+        QVERIFY(QDir().mkpath(root + u"/zero.desktop"_s));
+        QVERIFY(QFile::link(u"/dev/zero"_s, root + u"/zero.desktop/metadata.json"_s));
+        QVERIFY(QDir().mkpath(root + u"/pipe.desktop"_s));
+        const QByteArray fifo = (root + u"/pipe.desktop/metadata.json"_s).toLocal8Bit();
+        QCOMPARE(mkfifo(fifo.constData(), 0600), 0);
+        QDeadlineTimer deadline(5000);
+        AppearanceConfig cfg;
+        const QVariantList list = cfg.lookAndFeels();
+        QVERIFY(!deadline.hasExpired());
+        for (const QVariant &v : list) {
+            QVERIFY(v.toMap().value(u"id"_s).toString() != u"zero.desktop"_s);
+            QVERIFY(v.toMap().value(u"id"_s).toString() != u"pipe.desktop"_s);
+        }
+        QVERIFY(!list.isEmpty()); // the ordinary ones are still there
     }
 
     void globalThemes()

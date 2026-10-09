@@ -3,7 +3,9 @@
 // in the files, as the KCMs write them.
 
 #include "../cpp/autostartconfig.h"
+#include "../cpp/colorscheme.h"
 #include "../cpp/defaultapps.h"
+#include "../cpp/localeconfig.h"
 #include "../cpp/powerconfig.h"
 #include "../cpp/screenlockconfig.h"
 
@@ -300,16 +302,67 @@ private Q_SLOTS:
         QVERIFY(!c.add(u"not-installed.desktop"_s));
     }
 
+    // A link in the folder that someone else put there leads to a file of
+    // theirs choosing: Settings doesn't write through it.
+    void autostartDoesNotWriteThroughAStrangeLink()
+    {
+        AutostartConfig c;
+        QVERIFY(QDir().mkpath(path(u"autostart"_s)));
+        put(u"precious"_s, "keep me\n");
+        QVERIFY(QFile::link(path(u"precious"_s), path(u"autostart/evil.desktop"_s)));
+        QVERIFY(QFile::link(path(u"nowhere"_s), path(u"autostart/dangling.desktop"_s)));
+        QVERIFY(!c.setEnabled(u"evil.desktop"_s, false));
+        QVERIFY(!c.setEnabled(u"evil.desktop"_s, true));
+        QVERIFY(!c.setEnabled(u"dangling.desktop"_s, false));
+        // ... nor a launcher of an application: it would be hidden from the menu.
+        QVERIFY(QFile::link(path(u"share/applications/viewer-a.desktop"_s), path(u"autostart/launcher.desktop"_s)));
+        QVERIFY(!c.setEnabled(u"launcher.desktop"_s, false));
+        QVERIFY(!lines(u"share/applications/viewer-a.desktop"_s).contains(u"Hidden=true"_s));
+        // An ordinary entry still adds; when a link stands in its place it doesn't.
+        QVERIFY(c.add(u"viewer-a.desktop"_s));
+        QVERIFY(QFile::remove(path(u"autostart/viewer-a.desktop"_s)));
+        QVERIFY(QFile::link(path(u"precious"_s), path(u"autostart/viewer-a.desktop"_s)));
+        QVERIFY(!c.add(u"viewer-a.desktop"_s));
+        QCOMPARE(lines(u"precious"_s), (QStringList{u"keep me"_s}));
+        QVERIFY(!QFileInfo::exists(path(u"nowhere"_s)));
+        QVERIFY(QFileInfo(path(u"autostart/evil.desktop"_s)).isSymLink());
+    }
+
+    // A link to a .desktop file (a dotfiles folder) is the file: it is written
+    // through, as it was before.
+    void autostartWritesThroughALinkToADesktopFile()
+    {
+        AutostartConfig c;
+        QVERIFY(QDir().mkpath(path(u"autostart"_s)));
+        QVERIFY(QDir().mkpath(path(u"dotfiles"_s)));
+        put(u"dotfiles/mine.desktop"_s, "[Desktop Entry]\nType=Application\nName=Mine\nExec=mine\n");
+        QVERIFY(QFile::link(path(u"dotfiles/mine.desktop"_s), path(u"autostart/mine.desktop"_s)));
+        QVERIFY(c.setEnabled(u"mine.desktop"_s, false));
+        QVERIFY(lines(u"dotfiles/mine.desktop"_s).contains(u"Hidden=true"_s));
+    }
+
     void autostartRefusesOddNames()
     {
         AutostartConfig c;
-        for (const QString &bad : {u"../x.desktop"_s, u"a/b.desktop"_s, u"x.txt"_s, u".desktop"_s, QString(), u"a b.desktop"_s}) {
+        for (const QString &bad : {u"../x.desktop"_s, u"a/b.desktop"_s, u"x.txt"_s, u".desktop"_s, QString(), u"a b.desktop"_s, u"a.desktop\n"_s, u"a.desktop\n\n"_s}) {
             QVERIFY2(!AutostartConfig::validId(bad), qPrintable(bad));
             QVERIFY(!c.setEnabled(bad, false));
             QVERIFY(!c.remove(bad));
             QVERIFY(!c.add(bad));
         }
         QVERIFY(!QFileInfo::exists(path(u"autostart"_s)) || QDir(path(u"autostart"_s)).isEmpty(QDir::Files));
+    }
+
+    // Names that reach a tool or a file are checked from their first to their
+    // last character: a name that ends in a newline is not a plain name (a
+    // regular expression's $ would let it through).
+    void validatorsTakeNothingAfterTheEnd()
+    {
+        QVERIFY(ColorSchemeConfig::validName(u"BreezeDark"_s));
+        QVERIFY(!ColorSchemeConfig::validName(u"BreezeDark\n"_s));
+        QVERIFY(!ColorSchemeConfig::validName(u"-h"_s));
+        QVERIFY(LocaleConfig::validLocale(u"en_US.UTF-8"_s));
+        QVERIFY(!LocaleConfig::validLocale(u"en_US.UTF-8\n"_s));
     }
 
     void defaultAppsOfferOnlyWhatFits()

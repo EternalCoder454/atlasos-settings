@@ -67,6 +67,24 @@ private Q_SLOTS:
         QCOMPARE(markerLines(), 0);
     }
 
+    void onlyTheProgramsSettingsStartsAreRun()
+    {
+        QVERIFY(Launcher::allowedProgram(u"kcmshell6"_s));
+        QVERIFY(Launcher::allowedProgram(u"plasma-apply-colorscheme"_s));
+        QVERIFY(Launcher::allowedProgram(u"telamon-store"_s));
+        for (const QString &name : {u"sh"_s, u"bash"_s, u"python3"_s, u"/usr/bin/kcmshell6"_s, u"../bin/kcmshell6"_s, u"kcmshell6 "_s, u"Kcmshell6"_s, u"env"_s, QString()}) {
+            QVERIFY2(!Launcher::allowedProgram(name), qPrintable(name));
+        }
+        // A shell is refused before anything is looked up or started.
+        Launcher launcher;
+        QSignalSpy failed(&launcher, &Launcher::failed);
+        QVERIFY(!launcher.run({u"sh"_s, u"-c"_s, u"echo x >> " + m_marker}));
+        QVERIFY(!launcher.run({u"/bin/sh"_s, u"-c"_s, u"echo x >> " + m_marker}));
+        QTest::qWait(300);
+        QCOMPARE(markerLines(), 0);
+        QCOMPARE(failed.count(), 0);
+    }
+
     void startsTheFirstInstalledOne()
     {
         Launcher launcher;

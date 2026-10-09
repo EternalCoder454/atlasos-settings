@@ -84,7 +84,6 @@ use cxx_qt_lib::QString;
 use serde_json::{Value, json};
 use telamon_framework_ui::telamon_framework_system::crash::{self, Report};
 use telamon_updater_core::base::crash::{REPO, collect, display_name};
-use telamon_updater_core::notes::is_safe_link;
 
 #[derive(Default)]
 pub struct CrashReportsRust {
@@ -106,6 +105,36 @@ pub struct CrashReportsRust {
 
 fn qs(s: &str) -> QString {
     QString::from(s)
+}
+
+/// The only places the sheet opens in the browser: an issue of the Telamon OS
+/// project (a sent report's link) or the page that starts a new one with the
+/// report filled in (`crash::github_issue_url`), both on github.com under the
+/// project's account. Anything else the data said (the files are the
+/// framework's, and a stored link is only as good as the file) is not a link
+/// to open.
+fn crash_link_allowed(link: &str) -> bool {
+    const NEW_ISSUE: &str = "https://github.com/EternalCoder454/";
+    if crash::is_issue_url(link) {
+        return true;
+    }
+    let Some(rest) = link.strip_prefix(NEW_ISSUE) else {
+        return false;
+    };
+    // `<repo>/issues/new?title=...&body=...`, all percent-encoded.
+    let Some((repo, query)) = rest.split_once("/issues/new?") else {
+        return false;
+    };
+    !repo.is_empty()
+        && repo.len() <= 100
+        && repo
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+        && link.len() <= 8192
+        && query.starts_with("title=")
+        && query
+            .bytes()
+            .all(|b| (0x21..=0x7e).contains(&b) && !b"\\\"<>`{}|^".contains(&b))
 }
 
 /// "3 h 2 min", "2 d 5 h".
@@ -280,7 +309,7 @@ impl qobject::CrashReports {
     }
 
     pub fn is_safe_link(&self, link: &QString) -> bool {
-        is_safe_link(&link.to_string())
+        crash_link_allowed(&link.to_string())
     }
 
     /// Removes one pending report, by ID, from the list the sheet shows.
@@ -313,6 +342,48 @@ impl qobject::CrashReports {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_projects_issues_are_opened() {
+        for ok in [
+            "https://github.com/EternalCoder454/AtlasOS/issues/123",
+            "https://github.com/EternalCoder454/AtlasOS/issues/new?title=Crash%20in%20Settings&body=%2A%2AApp%3A%2A%2A",
+        ] {
+            assert!(crash_link_allowed(ok), "{ok}");
+        }
+        for bad in [
+            "",
+            "http://github.com/EternalCoder454/AtlasOS/issues/1",
+            "https://github.com/EternalCoder454/AtlasOS/issues/",
+            "https://github.com/EternalCoder454/AtlasOS/issues/1x",
+            "https://github.com/EternalCoder454/AtlasOS/pull/1",
+            "https://github.com/EternalCoder454/AtlasOS/issues/new?body=x",
+            "https://github.com/EternalCoder454/../x/issues/new?title=a",
+            "https://github.com/EternalCoder454/a/b/issues/new?title=a",
+            "https://github.com/EternalCoder455/AtlasOS/issues/1",
+            "https://github.com.evil.example/EternalCoder454/AtlasOS/issues/1",
+            "https://evil.example/https://github.com/EternalCoder454/AtlasOS/issues/1",
+            "https://github.com@evil.example/EternalCoder454/AtlasOS/issues/1",
+            "https://github.com/EternalCoder454/AtlasOS/issues/new?title=a b",
+            "https://github.com/EternalCoder454/AtlasOS/issues/new?title=a\n",
+            "https://github.com/EternalCoder454/AtlasOS/issues/new?title=\"x",
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+        ] {
+            assert!(!crash_link_allowed(bad), "{bad}");
+        }
+        // The links the framework itself makes are the ones that pass.
+        let report: Report = serde_json::from_value(json!({
+            "schema": 1, "event_id": "0123456789abcdef0123456789abcdef",
+            "report_type": "panic", "time": "2026-10-08T12:00:00Z", "crash_id": "c",
+            "app_name": "telamon-settings", "category": "Telamon app",
+            "message": "boom <b>\"quoted\"</b> & more\nsecond line",
+            "stacktrace": "frame 1\nframe 2", "uptime_secs": 5,
+            "ram_total_kb": 1, "mem_used_kb": 1
+        }))
+        .expect("a report");
+        assert!(crash_link_allowed(&crash::github_issue_url(&report, REPO)));
+    }
 
     #[test]
     fn uptime() {

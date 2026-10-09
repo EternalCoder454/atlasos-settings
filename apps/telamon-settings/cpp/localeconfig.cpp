@@ -46,7 +46,7 @@ KConfig open()
 bool LocaleConfig::validLocale(const QString &locale)
 {
     // As settings_sys::locale::valid_locale (crates/settings-sys/src/locale.rs).
-    static const QRegularExpression re(u"^(C|POSIX|C\\.UTF-8|C\\.utf8|[a-z]{2,3}(_[A-Z0-9]{2,3})?(\\.[A-Za-z0-9-]+)?(@[a-z]+)?)$"_s);
+    static const QRegularExpression re(u"\\A(C|POSIX|C\\.UTF-8|C\\.utf8|[a-z]{2,3}(_[A-Z0-9]{2,3})?(\\.[A-Za-z0-9-]+)?(@[a-z]+)?)\\z"_s);
     return locale.size() <= 32 && re.match(locale).hasMatch();
 }
 
@@ -61,7 +61,7 @@ QVariantMap LocaleConfig::read() const
         return validLocale(v) ? v : QString();
     };
     QString language = translations.readEntry("LANGUAGE", QString());
-    static const QRegularExpression languages(u"^[a-z]{2,3}(_[A-Z0-9]{2,3})?(@[a-z]+)?(:[a-z]{2,3}(_[A-Z0-9]{2,3})?(@[a-z]+)?){0,15}$"_s);
+    static const QRegularExpression languages(u"\\A[a-z]{2,3}(_[A-Z0-9]{2,3})?(@[a-z]+)?(:[a-z]{2,3}(_[A-Z0-9]{2,3})?(@[a-z]+)?){0,15}\\z"_s);
     if (!languages.match(language).hasMatch()) {
         language.clear();
     }

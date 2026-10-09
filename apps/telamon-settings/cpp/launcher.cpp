@@ -40,12 +40,29 @@ void Launcher::recordStart(const QStringList &key)
     m_starts.append(m_clock.elapsed());
 }
 
+bool Launcher::allowedProgram(const QString &name)
+{
+    static const QStringList allowed{
+        QStringLiteral("kcmshell6"),
+        QStringLiteral("plasma-apply-colorscheme"),
+        QStringLiteral("plasma-apply-wallpaperimage"),
+        QStringLiteral("plasma-apply-lookandfeel"),
+        QStringLiteral("gsettings"),
+        QStringLiteral("telamon-store"),
+    };
+    return allowed.contains(name);
+}
+
 bool Launcher::run(const QStringList &argv)
 {
     if (argv.isEmpty() || argv.first().isEmpty()) {
         return false;
     }
     const QString program = argv.first();
+    if (!allowedProgram(program)) {
+        qWarning().noquote() << "not starting" << program << ": not a program Settings starts";
+        return false;
+    }
     if (!allowed(argv, program)) {
         return true;
     }

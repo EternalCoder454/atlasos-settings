@@ -1,9 +1,13 @@
 // The old D-Bus identity of Settings, `net.eterneon.atlas.settings`, kept for
 // this release: the Launcher and other programs that have not moved yet call
 // `org.freedesktop.Application` there (Activate, ActivateAction) to raise the
-// window or open a page. The calls end up where KDBusService's do, as the
-// same `activateRequested(arguments, token)`; what they carry is read in Rust
-// like any launch argument (settings-registry's launch.rs).
+// window or open a page. The calls end up where KDBusService's do: Activate
+// and Open as `activateRequested(arguments, token)` (no arguments), and
+// ActivateAction as `activateActionRequested(action, parameter, token)`, the
+// same action and text KDBusService hands on, so the one reader of them,
+// settings-registry's launch.rs (`action_args`), decides what they mean. The
+// text of a call is never split into launch arguments here: a caller can't
+// slip options (`--kcm`, `--search`) in through it.
 #pragma once
 
 #include <QObject>
@@ -32,6 +36,10 @@ public Q_SLOTS:
     void ActivateAction(const QString &actionName, const QVariantList &parameter, const QVariantMap &platformData);
 
 Q_SIGNALS:
-    /// `arguments` as a launch would have them after the program name.
+    /// A plain activation (Activate, Open): raise the window. `arguments` is
+    /// always empty.
     void activateRequested(const QStringList &arguments, const QString &activationToken);
+    /// ActivateAction: `parameter` is the call's first parameter when it is
+    /// text, else "".
+    void activateActionRequested(const QString &action, const QString &parameter, const QString &activationToken);
 };

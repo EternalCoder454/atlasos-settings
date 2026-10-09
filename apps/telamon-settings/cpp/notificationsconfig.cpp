@@ -50,7 +50,7 @@ Known knownApp(const QString &id, const QMap<QString, Known> &notifyrc)
 
 bool NotificationsConfig::validAppId(const QString &id)
 {
-    static const QRegularExpression re(u"^[A-Za-z0-9._-]{1,200}$"_s);
+    static const QRegularExpression re(u"\\A[A-Za-z0-9._-]{1,200}\\z"_s);
     return re.match(id).hasMatch();
 }
 

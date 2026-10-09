@@ -67,7 +67,7 @@ const Kind *find(const QString &id)
 
 QString iconName(const QString &icon)
 {
-    static const QRegularExpression ok(u"^[A-Za-z0-9._+-]{1,100}$"_s);
+    static const QRegularExpression ok(u"\\A[A-Za-z0-9._+-]{1,100}\\z"_s);
     return ok.match(icon).hasMatch() ? icon : u"application-x-executable"_s;
 }
 

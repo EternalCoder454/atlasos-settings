@@ -1,6 +1,7 @@
 #include "appearanceconfig.h"
 
 #include "kdeutil.h"
+#include "smallfile.h"
 
 #include <KConfigWatcher>
 #include <KSharedConfig>
@@ -32,10 +33,12 @@ constexpr auto HighContrastLight = "TelamonHighContrastLight";
 constexpr auto HighContrastDark = "TelamonHighContrastDark";
 
 // A name a tool is given as a program argument: plain characters only, no
-// quote (plasma-apply-wallpaperimage builds a script around the name).
+// quote (plasma-apply-wallpaperimage builds a script around the name), and a
+// letter or digit first, so a folder somebody named "--help" or ".." can't be
+// read as an option (or a path) by the tool.
 bool plainName(const QString &name, int max = 100)
 {
-    static const QRegularExpression re(u"^[A-Za-z0-9._-]+$"_s);
+    static const QRegularExpression re(u"\\A[A-Za-z0-9][A-Za-z0-9._-]*\\z"_s);
     return !name.isEmpty() && name.size() <= max && re.match(name).hasMatch();
 }
 
@@ -228,9 +231,9 @@ QVariantMap packagePictures(const QString &packageDir)
 
 QString packageName(const QString &packageDir, const QString &id)
 {
-    QFile f(packageDir + u"/metadata.json"_s);
-    if (f.size() < 65536 && f.open(QIODevice::ReadOnly)) {
-        const QString name = QJsonDocument::fromJson(f.readAll()).object().value(u"KPlugin"_s).toObject().value(u"Name"_s).toString().left(100);
+    const QByteArray json = smallfile::read(packageDir + u"/metadata.json"_s, 65536);
+    if (!json.isNull()) {
+        const QString name = QJsonDocument::fromJson(json).object().value(u"KPlugin"_s).toObject().value(u"Name"_s).toString().left(100);
         if (!name.isEmpty()) {
             return name;
         }
@@ -329,7 +332,7 @@ QString AppearanceConfig::accentHex() const
 
 bool AppearanceConfig::validColor(const QString &hex)
 {
-    static const QRegularExpression re(u"^#[0-9a-fA-F]{6}$"_s);
+    static const QRegularExpression re(u"\\A#[0-9a-fA-F]{6}\\z"_s);
     return re.match(hex).hasMatch();
 }
 
@@ -635,11 +638,11 @@ QVariantList AppearanceConfig::lookAndFeels() const
     for (const QString &root : QStandardPaths::locateAll(QStandardPaths::GenericDataLocation, u"plasma/look-and-feel"_s, QStandardPaths::LocateDirectory)) {
         const QFileInfoList dirs = QDir(root).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Readable, QDir::Name);
         for (const QFileInfo &dir : dirs) {
-            QFile f(dir.absoluteFilePath() + u"/metadata.json"_s);
-            if (f.size() > 65536 || !f.open(QIODevice::ReadOnly)) {
+            const QByteArray json = smallfile::read(dir.absoluteFilePath() + u"/metadata.json"_s, 65536);
+            if (json.isNull()) {
                 continue;
             }
-            const QJsonObject plugin = QJsonDocument::fromJson(f.readAll()).object().value(u"KPlugin"_s).toObject();
+            const QJsonObject plugin = QJsonDocument::fromJson(json).object().value(u"KPlugin"_s).toObject();
             const QString id = plugin.value(u"Id"_s).toString();
             if (!plainName(id) || id != dir.fileName() || seen.contains(id) || list.size() >= 60) {
                 continue;

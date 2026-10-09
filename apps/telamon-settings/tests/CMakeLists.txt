@@ -25,5 +25,11 @@ telamon_settings_sound_test(soundlogic_test)
 telamon_settings_sound_test(soundmixer_test)
 telamon_settings_test(nightlight_test)
 if(TELAMON_SETTINGS_TEST_HOOKS)
-    telamon_settings_test(screenconfig_test)
+    # The one test that needs the fake screens links the copy of the screens'
+    # code that has the hook; the app never does.
+    add_executable(screenconfig_test screenconfig_test.cpp)
+    target_link_libraries(screenconfig_test PRIVATE telamon-settings-displays-hooks Qt6::Test)
+    add_test(NAME screenconfig_test COMMAND screenconfig_test)
+    set_tests_properties(screenconfig_test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;TELAMON_FIXTURES=${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 endif()
