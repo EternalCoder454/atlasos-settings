@@ -12,7 +12,7 @@
 %global debug_package %{nil}
 
 Name:           telamon-settings
-Version:        0.4.7
+Version:        0.5.0
 Release:        1%{?dist}
 Summary:        Settings, the settings app of Telamon OS
 License:        MIT
@@ -235,6 +235,32 @@ appstream-util validate-relax --nonet \
 %{_datadir}/applications/kdesystemsettings.desktop
 
 %changelog
+* Thu Oct 08 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.5.0-1
+- Security release; docs/SECURITY.md is the threat model.
+- The old D-Bus name (net.eterneon.atlas.settings) split the text of an
+  ActivateAction call into launch arguments, so a caller could slip --kcm or
+  --search in through it; it now hands the text to the same link check as the
+  new name, which accepts a page and a setting and nothing else.
+- Accounts: a picture is looked at before AccountsService is asked to copy it
+  (a regular file of at most 1 MB that is a PNG, JPEG, WebP or GIF by its
+  contents, not an SVG, never a link to something else), and says why when
+  it won't do. Passwords are hashed with yescrypt, as Fedora stores them
+  (SHA-512 with 100,000 rounds where libcrypt has none), and the key is
+  overwritten after; passwords above libcrypt's 511 byte limit are refused
+  up front instead of after the account was made.
+- Programs Settings starts are an allowlist (kcmshell6, the plasma-apply
+  tools, gsettings, Telamon Store), and names handed to them must start with a
+  letter or digit. Names checked by a regular expression no longer let a
+  trailing newline through.
+- The test hook that swaps the real screens for fake ones is no longer part of
+  the program (only the tests have it).
+- Support and crash report links open only on an allowlist of https sites;
+  the Flatpak override files are read without waiting on a pipe or trusting a
+  size checked earlier; KCM plugin paths are taken only in Plasma's form.
+- The package build checks its programs' hardening (PIE, full RELRO, no
+  executable stack, stack protectors) and fails without it; CI runs
+  cargo-deny and cargo-audit, and property tests of the parsers.
+
 * Thu Oct 08 2026 EternalHell <77252745+EternalCoder454@users.noreply.github.com> - 0.4.7-1
 - Fix: the app used about 8% of a core with its window idle. The icon layers added in the last release
   were redrawn on every frame with Qt Quick's software renderer; a layer is live now only for a moment
