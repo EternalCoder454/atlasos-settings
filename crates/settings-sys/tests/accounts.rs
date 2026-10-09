@@ -114,6 +114,11 @@ fn the_password_goes_as_a_hash_never_as_text() {
         a.set_password(1000, "").unwrap_err().kind,
         ErrorKind::Refused
     );
+    // Short passwords are refused here: the service would store any hash.
+    assert_eq!(
+        a.set_password(1000, "short").unwrap_err().kind,
+        ErrorKind::Refused
+    );
     // What the mock saw of the calls: the arguments are logged by the
     // mock, so check the clear text isn't among them.
     let log = ext::call_log(&bus, NAME, "/org/freedesktop/Accounts/User1000");

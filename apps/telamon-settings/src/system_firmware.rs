@@ -278,7 +278,13 @@ pub fn read(dir: &Path) -> Option<SystemFirmware> {
     };
     let help = support(&sys, &board, &model);
     f.maker = help.name;
-    f.support_url = help.url;
+    // Built from the table or the search, and checked again here: what the
+    // page may open is never more than the allowlist says.
+    f.support_url = if support_url_allowed(&help.url) {
+        help.url
+    } else {
+        String::new()
+    };
     f.model = if placeholder(&model) {
         String::new()
     } else {

@@ -419,12 +419,12 @@ impl qobject::NetworkPage {
         let ssid = ssid.to_string();
         let joining = ssid.clone();
         let named = ssid.clone();
-        let pw = password.to_string();
-        let with_password = !pw.is_empty();
+        // In a Secret from the start: overwritten when the call is over.
+        let secret = Secret::new(password.to_string());
+        let with_password = !secret.is_empty();
         self.change(
             &joining,
             move || {
-                let secret = Secret::new(pw);
                 let net = Network::new(&crate::support::system())?;
                 net.connect_wifi(&ssid, (!secret.is_empty()).then_some(&secret))
             },
@@ -467,11 +467,10 @@ impl qobject::NetworkPage {
 
     pub fn start_hotspot(self: Pin<&mut Self>, name: &QString, password: &QString) {
         let name = name.to_string();
-        let pw = password.to_string();
+        let secret = Secret::new(password.to_string());
         self.change(
             "",
             move || {
-                let secret = Secret::new(pw);
                 Network::new(&crate::support::system())?
                     .start_hotspot(&name, (!secret.is_empty()).then_some(&secret))
             },
@@ -504,7 +503,9 @@ impl qobject::NetworkPage {
     }
 
     pub fn valid_password(&self, security: &QString, password: &QString) -> bool {
-        network::valid_password(parse_security(&security.to_string()), &password.to_string())
+        // Checked on every keystroke: the copy is wiped when it goes.
+        let password = Secret::new(password.to_string());
+        network::valid_password(parse_security(&security.to_string()), password.expose())
     }
 
     pub fn valid_hotspot_name(&self, name: &QString) -> bool {

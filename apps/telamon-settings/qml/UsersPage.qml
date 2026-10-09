@@ -450,7 +450,7 @@ SettingsPage {
         title: qsTr("Change Password")
         preferredWidth: Kirigami.Units.gridUnit * 26
         readonly property bool matches: newPassword.text === confirmPassword.text
-        readonly property bool ready: newPassword.text.length > 0 && matches
+        readonly property bool ready: page.sys !== null && page.sys.validPassword(newPassword.text) && matches
         function clear() {
             newPassword.text = "";
             confirmPassword.text = "";
@@ -487,6 +487,7 @@ SettingsPage {
             id: newPassword
             Layout.fillWidth: true
             placeholderText: qsTr("New password")
+            errorText: text.length > 0 && page.sys && !page.sys.validPassword(text) ? qsTr("Use at least 8 characters") : ""
             onAccepted: confirmPassword.forceActiveFocus()
             Accessible.name: qsTr("New password")
         }
@@ -722,7 +723,7 @@ SettingsPage {
         preferredWidth: Kirigami.Units.gridUnit * 26
         property bool nameEdited: false
         readonly property bool matches: addPassword.text === addConfirm.text
-        readonly property bool ready: page.sys !== null && page.sys.validRealName(addName.text) && page.sys.validUserName(addUser.text) && addPassword.text.length > 0 && matches
+        readonly property bool ready: page.sys !== null && page.sys.validRealName(addName.text) && page.sys.validUserName(addUser.text) && page.sys.validPassword(addPassword.text) && matches
         function clear() {
             addName.text = "";
             addUser.text = "";
@@ -778,6 +779,7 @@ SettingsPage {
             id: addPassword
             Layout.fillWidth: true
             placeholderText: qsTr("Password")
+            errorText: text.length > 0 && page.sys && !page.sys.validPassword(text) ? qsTr("Use at least 8 characters") : ""
             onAccepted: addConfirm.forceActiveFocus()
             Accessible.name: qsTr("Password")
         }

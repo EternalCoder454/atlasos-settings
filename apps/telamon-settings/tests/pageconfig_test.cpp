@@ -24,6 +24,8 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <sys/stat.h>
+
 using namespace Qt::StringLiterals;
 
 namespace
@@ -388,6 +390,27 @@ private Q_SLOTS:
             QVERIFY2(changed.wait(3000), "no change announced");
             changed.clear();
         }
+    }
+
+    // metadata.json that is a link to /dev/zero (size 0, never ends) or a pipe
+    // (open waits for a writer) is skipped, not read.
+    void plantedMetadataIsNotRead()
+    {
+        const QString root = dir("sys") + u"/plasma/look-and-feel"_s;
+        QVERIFY(QDir().mkpath(root + u"/zero.desktop"_s));
+        QVERIFY(QFile::link(u"/dev/zero"_s, root + u"/zero.desktop/metadata.json"_s));
+        QVERIFY(QDir().mkpath(root + u"/pipe.desktop"_s));
+        const QByteArray fifo = (root + u"/pipe.desktop/metadata.json"_s).toLocal8Bit();
+        QCOMPARE(mkfifo(fifo.constData(), 0600), 0);
+        QDeadlineTimer deadline(5000);
+        AppearanceConfig cfg;
+        const QVariantList list = cfg.lookAndFeels();
+        QVERIFY(!deadline.hasExpired());
+        for (const QVariant &v : list) {
+            QVERIFY(v.toMap().value(u"id"_s).toString() != u"zero.desktop"_s);
+            QVERIFY(v.toMap().value(u"id"_s).toString() != u"pipe.desktop"_s);
+        }
+        QVERIFY(!list.isEmpty()); // the ordinary ones are still there
     }
 
     void globalThemes()

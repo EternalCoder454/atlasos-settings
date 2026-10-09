@@ -108,7 +108,17 @@ fn text_formats(block: &str) -> Vec<&str> {
 #[test]
 fn drawn_text_is_plain() {
     for (file, src) in sources() {
-        for (line, block) in blocks(&src, &["Text", "QQC2.Label", "QQC2.TextArea", "TextEdit"]) {
+        for (line, block) in blocks(
+            &src,
+            &[
+                "Text",
+                "Label",
+                "QQC2.Label",
+                "Controls.Label",
+                "QQC2.TextArea",
+                "TextEdit",
+            ],
+        ) {
             let formats = text_formats(block);
             assert!(
                 formats.iter().any(|f| f.ends_with("PlainText")),

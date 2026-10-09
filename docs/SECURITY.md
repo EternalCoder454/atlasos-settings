@@ -49,7 +49,7 @@ Entry points, all on the session bus or the command line:
 
 | Entry | Who can call it | What it can ask for |
 |---|---|---|
-| `net.eterneon.telamon.settings` `org.freedesktop.Application.Activate` / `Open` | any session process | raise the window (`Activate`); `Open` has no handler: no document is ever opened |
+| `net.eterneon.telamon.settings` `org.freedesktop.Application.Activate` / `Open` | any session process | raise the window (`Activate`); `Open` has no handler wired in `main.cpp`, so no document is opened (were KDBusService to forward the URIs as an activation they would meet `launch::parse`, which is `CommandLine`'s row) |
 | `...Application.ActivateAction("open", [link])` | any session process | a **page and setting of the registry**, nothing else |
 | `...Application.ActivateAction("open-app", [id])` | any session process | the Apps page at App Permissions |
 | `org.kde.KDBusService.CommandLine(args)` | any session process; this is how a second `telamon-settings ...` start reaches the first | what the command line can: a page, a setting, a search, a KCM by name |
@@ -104,13 +104,14 @@ Rules:
   stays text. *Tests:* `fuzz_plan.rs`, `fuzz_launch.rs`, `plan.rs`,
   `backend.rs` (`kcm_commands`), `scripts/ui-stress.sh` (shell syntax in
   `--args` runs nothing).
-- **`plasma-apply-colorscheme` / `-lookandfeel` / `-wallpaperimage`** get names
-  that are read back from the installed lists (a scheme must be one of the
-  scheme files; a Global Theme or wallpaper must be one `lookAndFeels()` /
-  `wallpapers()` offered, by exact ID), made of `[A-Za-z0-9._-]`, **starting
-  with a letter or digit** so a folder named `--help` cannot become an option,
-  and anchored with `\A...\z` (a regular expression's `$` lets a trailing
-  newline through). Wallpaper image paths are absolute, have no control
+- **`plasma-apply-colorscheme`** is given one of Settings' own scheme names
+  (`TelamonLight`, `TelamonDark`, the high-contrast pair: constants in the
+  code) and `--accent-color` with a `#rrggbb` that was parsed from numbers or
+  matched `\A#[0-9a-fA-F]{6}\z`. **`-lookandfeel` / `-wallpaperimage`** get an
+  ID that `lookAndFeels()` / `wallpapers()` offered, made of `[A-Za-z0-9._-]`,
+  **starting with a letter or digit** so a folder named `--help` cannot become
+  an option, and anchored with `\A...\z` (a regular expression's `$` lets a
+  trailing newline through). Wallpaper image paths are absolute, have no control
   characters and no `'` (the tool builds a script around the name).
 - **`xdg-open`** is never run. Links go through `Qt.openUrlExternally`, which
   Qt hands to the desktop (the OpenURI portal or `xdg-open`) as a URL, never
@@ -142,8 +143,9 @@ line of KDE's `systemsettings`.
 ## 4. Secrets
 
 - **Wi-Fi and hotspot passwords** go from the password field to Rust as a
-  `QString` copy, into a `Secret` (not shown by `Debug`, overwritten when
-  dropped), and from there only to NetworkManager in `AddAndActivateConnection`.
+  `QString`, are copied into a `Secret` at once (not shown by `Debug`,
+  overwritten when dropped; also for the check of every keystroke), and from
+  there only to NetworkManager in `AddAndActivateConnection`.
   NetworkManager stores them (root-only, in its connection files). **Settings
   never reads a secret back**: no `GetSecrets`, and `GetSettings` omits them.
   A connection that does not come up is deleted again.
@@ -155,16 +157,21 @@ line of KDE's `systemsettings`.
   no yescrypt), verified by hashing again, and only the **hash** goes to
   AccountsService (`SetPassword(hash, "")`); the clear text is never on the
   bus. The C string handed to `crypt` is overwritten afterwards and the Rust
-  copy (`Secret`) too. The longest accepted password is 511 bytes (libcrypt's
-  limit), refused before an account is created, not after.
+  copy (`Secret`) too. A password has 8 to 511 bytes' worth of characters
+  (`MIN_PASSWORD`; libcrypt's limit above), refused before an account is
+  created, not after: AccountsService stores any hash it is given and checks
+  nothing about the password, so this is the only quality rule there is.
 - **Never logged**: error details come from the services' D-Bus error text,
   which does not carry the values sent; a test pins that `Secret` prints as
   `Secret(..)`; the crash reports' redaction is the framework's.
-- **Fields are emptied** when their sheet closes or a join is tried
-  (`...text = ""` for every `TelamonPasswordField`, which `qml_text.rs`
-  insists on), so a password does not sit in a QML property after it was used.
+- **Fields are emptied** when their sheet opens and closes (`...text = ""` for
+  every `TelamonPasswordField`; `qml_text.rs` insists a clear exists in the
+  file), so a password does not sit in a QML property after its sheet is gone.
+  A join that fails keeps what was typed until the sheet closes, so it can be
+  corrected.
 - *Residual:* Qt's own copies of a typed string (the field, the `QString`
-  that crossed into Rust) are freed by Qt, not wiped; and the hash can appear
+  that crossed into Rust) and the D-Bus message buffers of zbus are freed, not
+  wiped; and the hash can appear
   in the argument list
   (a hash, not the password), in the helper AccountsService runs.
 
@@ -187,8 +194,10 @@ line of KDE's `systemsettings`.
   1 MB**, and a **PNG, JPEG, GIF or WebP by its first bytes**, whatever it is
   called. SVG is not accepted (a document is not a picture the sign-in screen
   should draw). The path handed to the service is the *resolved* one, so a link
-  that is changed after the check does not change what was checked; the
-  service then copies it itself, as the user, with its own checks. The reason a
+  that is swapped for another at the last step does not change what was checked; the
+  service then copies it itself, as the user, with its own checks (a swap of
+  the file or of a folder above it after the check is not prevented: see the
+  end). The reason a
   file is refused is shown in words. *Tests:* `accounts.rs` unit tests (kinds,
   size, links, pipes, devices, folders, dangling and circular links) and
   the D-Bus test (`changes_a_users_name_picture_and_type`).
@@ -232,9 +241,11 @@ engine, but only when the person presses the button for it.
 - **Reading** files others may have made: Flatpak metadata and overrides
   are opened once, must be regular files and are capped at 256 KiB, so a pipe,
   a device or a file that grew after it was measured cannot stall Settings or
-  fill its memory; Look-and-feel metadata is capped at 64 KiB; names and
-  comments from desktop files are capped, and icon names must be theme names,
-  not paths.
+  fill its memory; wallpaper and Global Theme `metadata.json` (64 KiB) and
+  autostart desktop files (64 KiB) must be regular files too and are read
+  with a bound (`kdeutil::readSmallFile`); names and comments from desktop
+  files are capped, and icon names must be theme names, not paths. *Test:*
+  `plantedMetadataIsNotRead` (a link to `/dev/zero`, a pipe).
 - **Modes**: new files get the umask's modes (KConfig) or `0644` (overrides,
   as Flatpak writes them); nothing Settings writes holds a secret.
 
@@ -281,7 +292,10 @@ pinned by commit). Settings' part: it passes only values it was shown.
   says the release is not trusted, then downloads, checks and hands the file
   to fwupd. The person confirms first.
 - **Fixture and test hooks** of the engine (`TELAMON_UPDATER_FIXTURES`...) are
-  compiled out of release builds (`debug_assertions`/feature gated). Settings'
+  compiled only with `debug_assertions` or the engine's `fixtures` feature;
+  Settings enables neither in a release build (checked by reading the
+  engine's `config.rs` at the pinned commit, not by a test: a release build
+  that turned the feature on would not be caught). Settings'
   own bus override, `TELAMON_SETTINGS_TEST_BUS`, is likewise debug only, and
   the fake-screens hook (`TELAMON_SETTINGS_FAKE_DISPLAYS`) is **not part of the
   program since 0.5.0**: it was compiled into the release binary; now only the

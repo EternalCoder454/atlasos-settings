@@ -124,6 +124,11 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "passwordScore"]
         fn password_score(self: &UsersPage, password: &QString) -> i32;
+
+        /// Whether `password` is long enough to be used (and not too long).
+        #[qinvokable]
+        #[cxx_name = "validPassword"]
+        fn valid_password(self: &UsersPage, password: &QString) -> bool;
     }
 
     impl cxx_qt::Threading for UsersPage {}
@@ -551,6 +556,12 @@ impl qobject::UsersPage {
         qs(&accounts::suggest_user_name(&real_name.to_string()))
     }
 
+    pub fn valid_password(&self, password: &QString) -> bool {
+        let p = Secret::of(password);
+        let n = p.0.chars().count();
+        n >= accounts::MIN_PASSWORD && p.0.len() <= accounts::MAX_PASSWORD
+    }
+
     pub fn password_score(&self, password: &QString) -> i32 {
         password_score(&Secret::of(password).0)
     }
@@ -561,8 +572,9 @@ fn uid_of(uid: i32) -> Result<u64, Error> {
 }
 
 /// 0 (very weak) to 4 (strong), -1 for nothing typed: length and the kinds
-/// of characters, not a promise. AccountsService and PAM have the last word
-/// (pwquality).
+/// of characters, not a promise. AccountsService stores the hash it is given
+/// and checks nothing, so the only rule enforced is the shortest allowed
+/// (`accounts::MIN_PASSWORD`, in `hash_password`).
 fn password_score(p: &str) -> i32 {
     if p.is_empty() {
         return -1;

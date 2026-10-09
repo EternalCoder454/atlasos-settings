@@ -314,6 +314,10 @@ private Q_SLOTS:
         QVERIFY(!c.setEnabled(u"evil.desktop"_s, false));
         QVERIFY(!c.setEnabled(u"evil.desktop"_s, true));
         QVERIFY(!c.setEnabled(u"dangling.desktop"_s, false));
+        // ... nor a launcher of an application: it would be hidden from the menu.
+        QVERIFY(QFile::link(path(u"share/applications/viewer-a.desktop"_s), path(u"autostart/launcher.desktop"_s)));
+        QVERIFY(!c.setEnabled(u"launcher.desktop"_s, false));
+        QVERIFY(!lines(u"share/applications/viewer-a.desktop"_s).contains(u"Hidden=true"_s));
         // An ordinary entry still adds; when a link stands in its place it doesn't.
         QVERIFY(c.add(u"viewer-a.desktop"_s));
         QVERIFY(QFile::remove(path(u"autostart/viewer-a.desktop"_s)));

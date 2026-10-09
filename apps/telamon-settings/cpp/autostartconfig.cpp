@@ -1,5 +1,7 @@
 #include "autostartconfig.h"
 
+#include "smallfile.h"
+
 #include <KApplicationTrader>
 #include <KConfig>
 #include <KConfigGroup>
@@ -25,6 +27,14 @@ constexpr auto Entry = "Desktop Entry";
 // More than this is not a list a person reads.
 constexpr int MaxEntries = 500;
 constexpr int MaxApps = 2000;
+// A desktop file is a few lines; a bigger one (or a pipe, or a device) was not
+// made by an app and is not read.
+constexpr qint64 MaxDesktopFile = 64 * 1024;
+
+bool isSmallFile(const QString &path, qint64 max)
+{
+    return smallfile::is(path, max);
+}
 
 QString userDir()
 {
@@ -50,7 +60,7 @@ QString systemFile(const QString &id)
 {
     for (const QString &d : systemDirs()) {
         const QString path = d + u'/' + id;
-        if (QFileInfo::exists(path)) {
+        if (isSmallFile(path, MaxDesktopFile)) {
             return path;
         }
     }
@@ -68,7 +78,18 @@ bool safeToWrite(const QString &path)
     const QFileInfo info(path);
     if (info.isSymLink()) {
         const QString target = info.canonicalFilePath();
-        return !target.isEmpty() && QFileInfo(target).isFile() && target.endsWith(u".desktop"_s);
+        if (target.isEmpty() || !QFileInfo(target).isFile() || !target.endsWith(u".desktop"_s)) {
+            return false;
+        }
+        // Not another program's launcher: turning an entry off would write
+        // into the application's own desktop file and hide it from the menu.
+        for (const QString &apps : QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)) {
+            const QString root = QDir(apps).canonicalPath();
+            if (!root.isEmpty() && target.startsWith(root + u'/')) {
+                return false;
+            }
+        }
+        return true;
     }
     return !info.exists() || info.isFile();
 }
@@ -86,6 +107,12 @@ bool shownInPlasma(const KConfigGroup &g)
 bool enabledIn(const KConfigGroup &g)
 {
     return !g.readEntry("Hidden", false) && g.readEntry("X-GNOME-Autostart-enabled", true);
+}
+
+// Whether the desktop file at `path` is a plausible one and says "on".
+bool enabledFile(const QString &path)
+{
+    return isSmallFile(path, MaxDesktopFile) && enabledIn(KDesktopFile(path).desktopGroup());
 }
 
 // A theme icon name; a path or anything odd is not shown.
@@ -113,7 +140,7 @@ QVariantList AutostartConfig::entries() const
     QSet<QString> systemIds;
     for (const QString &d : systemDirs()) {
         for (const QString &name : QDir(d).entryList({u"*.desktop"_s}, QDir::Files)) {
-            if (validId(name) && !files.contains(name)) {
+            if (validId(name) && !files.contains(name) && isSmallFile(d + u'/' + name, MaxDesktopFile)) {
                 files.insert(name, d + u'/' + name);
                 systemIds.insert(name);
             }
@@ -121,7 +148,7 @@ QVariantList AutostartConfig::entries() const
     }
     const QString user = userDir();
     for (const QString &name : QDir(user).entryList({u"*.desktop"_s}, QDir::Files)) {
-        if (validId(name)) {
+        if (validId(name) && isSmallFile(user + u'/' + name, MaxDesktopFile)) {
             files.insert(name, user + u'/' + name);
         }
     }
@@ -168,10 +195,10 @@ bool AutostartConfig::isEnabled(const QString &id) const
     }
     const QString user = userDir() + u'/' + id;
     if (QFileInfo::exists(user)) {
-        return enabledIn(KDesktopFile(user).desktopGroup());
+        return enabledFile(user);
     }
     const QString sys = systemFile(id);
-    return !sys.isEmpty() && enabledIn(KDesktopFile(sys).desktopGroup());
+    return !sys.isEmpty() && enabledFile(sys);
 }
 
 bool AutostartConfig::known(const QString &id) const
@@ -211,7 +238,7 @@ bool AutostartConfig::setEnabled(const QString &id, bool on)
         const QStringList keys = g.keyList();
         const bool onlyMask = keys.isEmpty() || (keys.size() == 1 && keys.first() == u"Type"_s);
         if (onlyMask && !sys.isEmpty()) {
-            if (!enabledIn(KDesktopFile(sys).desktopGroup())) {
+            if (!enabledFile(sys)) {
                 // The system's entry is off by itself: say "on" explicitly.
                 g.writeEntry("Hidden", false);
                 return config.sync();
@@ -223,7 +250,7 @@ bool AutostartConfig::setEnabled(const QString &id, bool on)
     if (sys.isEmpty()) {
         return false;
     }
-    if (enabledIn(KDesktopFile(sys).desktopGroup())) {
+    if (enabledFile(sys)) {
         return true;
     }
     KConfig config(path, KConfig::SimpleConfig);

@@ -1,6 +1,7 @@
 #include "appearanceconfig.h"
 
 #include "kdeutil.h"
+#include "smallfile.h"
 
 #include <KConfigWatcher>
 #include <KSharedConfig>
@@ -230,9 +231,9 @@ QVariantMap packagePictures(const QString &packageDir)
 
 QString packageName(const QString &packageDir, const QString &id)
 {
-    QFile f(packageDir + u"/metadata.json"_s);
-    if (f.size() < 65536 && f.open(QIODevice::ReadOnly)) {
-        const QString name = QJsonDocument::fromJson(f.readAll()).object().value(u"KPlugin"_s).toObject().value(u"Name"_s).toString().left(100);
+    const QByteArray json = smallfile::read(packageDir + u"/metadata.json"_s, 65536);
+    if (!json.isNull()) {
+        const QString name = QJsonDocument::fromJson(json).object().value(u"KPlugin"_s).toObject().value(u"Name"_s).toString().left(100);
         if (!name.isEmpty()) {
             return name;
         }
@@ -637,11 +638,11 @@ QVariantList AppearanceConfig::lookAndFeels() const
     for (const QString &root : QStandardPaths::locateAll(QStandardPaths::GenericDataLocation, u"plasma/look-and-feel"_s, QStandardPaths::LocateDirectory)) {
         const QFileInfoList dirs = QDir(root).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot | QDir::Readable, QDir::Name);
         for (const QFileInfo &dir : dirs) {
-            QFile f(dir.absoluteFilePath() + u"/metadata.json"_s);
-            if (f.size() > 65536 || !f.open(QIODevice::ReadOnly)) {
+            const QByteArray json = smallfile::read(dir.absoluteFilePath() + u"/metadata.json"_s, 65536);
+            if (json.isNull()) {
                 continue;
             }
-            const QJsonObject plugin = QJsonDocument::fromJson(f.readAll()).object().value(u"KPlugin"_s).toObject();
+            const QJsonObject plugin = QJsonDocument::fromJson(json).object().value(u"KPlugin"_s).toObject();
             const QString id = plugin.value(u"Id"_s).toString();
             if (!plainName(id) || id != dir.fileName() || seen.contains(id) || list.size() >= 60) {
                 continue;

@@ -99,7 +99,9 @@ for f in "$@"; do
     if [ "$cxx" = 1 ]; then
         symbols=$(readelf -sW --dyn-syms "$f" 2>/dev/null; readelf -sW "$f" 2>/dev/null || true)
         grep -q '__stack_chk_fail' <<<"$symbols" || bad "$f" "no stack protector (__stack_chk_fail is not used)"
-        if grep -aq 'TELAMON_SETTINGS_FAKE_DISPLAYS' "$f"; then
+        # As ASCII (qgetenv) or as UTF-16 (a QString literal).
+        if grep -aq 'TELAMON_SETTINGS_FAKE_DISPLAYS' "$f" ||
+            LC_ALL=C grep -aq 'T.E.L.A.M.O.N._.S.E.T.T.I.N.G.S._.F.A.K.E._.D.I.S.P.L.A.Y.S' "$f"; then
             bad "$f" "holds the tests' fake-screens hook (TELAMON_SETTINGS_FAKE_DISPLAYS)"
         fi
     fi

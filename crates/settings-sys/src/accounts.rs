@@ -30,6 +30,11 @@ pub const MAX_REAL_NAME: usize = 128;
 /// hashes nothing. A longer one is refused here, up front, not after the
 /// account was created.
 pub const MAX_PASSWORD: usize = 511;
+/// The fewest characters a new password has: AccountsService stores the hash
+/// it is given and checks nothing about the password (that is why the hash is
+/// made here), so a password of one letter would be accepted for an
+/// administrator. 8 is what PAM's pwquality asks of `passwd` by default.
+pub const MIN_PASSWORD: usize = 8;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct User {
@@ -140,9 +145,14 @@ pub fn check_picture(file: &str) -> Result<String, &'static str> {
     }
     // No link at the end (it was resolved; one swapped in since is refused),
     // and no waiting on a pipe or a device.
+    // The kind of file first, from `stat`, so a link to a terminal or a tape
+    // is not even opened; the open below is checked again (`fstat`).
+    if !std::fs::metadata(&resolved).is_ok_and(|m| m.is_file()) {
+        return Err("That isn't a picture file.");
+    }
     let mut f = std::fs::OpenOptions::new()
         .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_NOCTTY | libc::O_CLOEXEC)
         .open(&resolved)
         .map_err(|_| "Settings can't read that file.")?;
     let meta = f.metadata().map_err(|_| "Settings can't read that file.")?;
@@ -161,6 +171,7 @@ pub fn check_picture(file: &str) -> Result<String, &'static str> {
         match f.read(&mut head[n..]) {
             Ok(0) => break,
             Ok(k) => n += k,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
             Err(_) => return Err("Settings can't read that file."),
         }
     }
@@ -247,7 +258,10 @@ fn crypt_with(key: &CStr, setting: &CStr) -> Option<String> {
 /// no yescrypt. The hash is checked by hashing the password again with it
 /// before it is returned.
 pub fn hash_password(password: &str) -> Result<String, Error> {
-    if password.is_empty() || password.len() > MAX_PASSWORD || password.contains('\0') {
+    if password.chars().count() < MIN_PASSWORD
+        || password.len() > MAX_PASSWORD
+        || password.contains('\0')
+    {
         return Err(Error::new(ErrorKind::Refused, "not a usable password"));
     }
     let key = CString::new(password)
@@ -431,18 +445,43 @@ impl Accounts {
                 &(name, real_name.trim(), i32::from(admin)),
             )?
             .ok_or_else(|| Error::new(ErrorKind::Refused, "no answer to CreateUser"))?;
-        let user = self.user_at(&self.interactive, path.as_str())?;
-        let uid: u64 = user.get_property("Uid")?;
-        let set: Result<Option<()>, zbus::Error> = user.call_with_flags(
-            "SetPassword",
-            MethodFlags::AllowInteractiveAuth.into(),
-            &(hash.as_str(), ""),
-        );
-        if let Err(e) = set {
-            let _ = self.delete_user(uid, true);
-            return Err(e.into());
+        // Whatever goes wrong from here on, the new account is removed again:
+        // there is never one without a password. Its ID is the service's
+        // `Uid`, or the end of its object path (`.../User1002`).
+        let uid_from_path = || {
+            path.as_str()
+                .rsplit('/')
+                .next()
+                .and_then(|n| n.strip_prefix("User"))
+                .and_then(|n| n.parse::<u64>().ok())
+        };
+        let finish = || -> Result<u64, Error> {
+            let user = self.user_at(&self.interactive, path.as_str())?;
+            let set: Result<Option<()>, zbus::Error> = user.call_with_flags(
+                "SetPassword",
+                MethodFlags::AllowInteractiveAuth.into(),
+                &(hash.as_str(), ""),
+            );
+            set?;
+            user.get_property::<u64>("Uid")
+                .ok()
+                .or_else(uid_from_path)
+                .ok_or_else(|| Error::new(ErrorKind::Refused, "the new user has no ID"))
+        };
+        match finish() {
+            Ok(uid) => Ok(uid),
+            Err(e) => {
+                if let Some(uid) = self
+                    .user_at(&self.interactive, path.as_str())
+                    .ok()
+                    .and_then(|u| u.get_property::<u64>("Uid").ok())
+                    .or_else(uid_from_path)
+                {
+                    let _ = self.delete_user(uid, true);
+                }
+                Err(e)
+            }
         }
-        Ok(uid)
     }
 
     /// Removes a user, and their files when `remove_files`.
@@ -548,6 +587,12 @@ mod tests {
             "{a}"
         );
         assert!(hash_password("").is_err());
+        // Too short is refused (7 characters), the shortest is not (8, counted
+        // in characters, not bytes).
+        assert!(hash_password("abcdefg").is_err());
+        assert!(hash_password("abcdefgh").is_ok());
+        assert!(hash_password("äöüäöüä").is_err());
+        assert!(hash_password("äöüäöüäö").is_ok());
         assert!(hash_password(&"x".repeat(MAX_PASSWORD + 1)).is_err());
         assert!(hash_password("a\0b").is_err());
         // A long password and one that is not ASCII.
