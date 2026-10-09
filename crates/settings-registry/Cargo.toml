@@ -13,3 +13,4 @@ publish = false
 # Only the tests read the Launcher's index back.
 [dev-dependencies]
 serde_json = "1"
+proptest.workspace = true
