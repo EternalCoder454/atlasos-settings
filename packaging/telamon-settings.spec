@@ -253,7 +253,8 @@ scripts/check-hardening.sh %{buildroot}%{_bindir}/systemsettings
   it won't do. Passwords are hashed with yescrypt, as Fedora stores them
   (SHA-512 with 100,000 rounds where libcrypt has none), and the key is
   overwritten after; passwords above libcrypt's 511 byte limit are refused
-  up front instead of after the account was made.
+  up front instead of after the account was made. A new password has at
+  least 8 characters, and a failed Add User leaves no account behind.
 - Programs Settings starts are an allowlist (kcmshell6, the plasma-apply
   tools, gsettings, Telamon Store), and names handed to them must start with a
   letter or digit. Names checked by a regular expression no longer let a
@@ -262,7 +263,9 @@ scripts/check-hardening.sh %{buildroot}%{_bindir}/systemsettings
   the program (only the tests have it).
 - Support and crash report links open only on an allowlist of https sites;
   the Flatpak override files are read without waiting on a pipe or trusting a
-  size checked earlier; KCM plugin paths are taken only in Plasma's form.
+  size checked earlier; wallpaper and theme metadata and autostart entries are
+  read only when they are small regular files (a link to /dev/zero froze the
+  page); KCM plugin paths are taken only in Plasma's form.
 - The package build checks its programs' hardening (PIE, full RELRO, no
   executable stack, stack protectors) and fails without it; CI runs
   cargo-deny and cargo-audit, and property tests of the parsers.
