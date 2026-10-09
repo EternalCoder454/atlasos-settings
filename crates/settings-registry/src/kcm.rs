@@ -75,7 +75,8 @@ pub const MAX_NAME: usize = 64;
 /// then 1 to 64 of `A-Z a-z 0-9 _ -`, a letter or digit first after an
 /// optional `_` (Plasma has `kcm_recentFiles` and
 /// `kcmspellchecking`): no dots, slashes or spaces, so it can never name a
-/// path or another program.
+/// path or another program. A path is taken only in Plasma's plugin form
+/// (`plugin_path_ok`).
 pub fn normalize(raw: &str) -> Option<String> {
     if HOME_NAMES.contains(&raw) {
         return Some(raw.to_string());
@@ -90,9 +91,30 @@ pub fn normalize(raw: &str) -> Option<String> {
         && rest
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-');
-    // A path is only taken for Plasma's plugin folders.
-    let path_ok = !raw.contains('/') || raw.starts_with("plasma/kcms/");
-    (ok && path_ok).then(|| base.to_string())
+    (ok && plugin_path_ok(raw)).then(|| base.to_string())
+}
+
+/// Whether `raw` is no path, or Plasma's plugin path for a KCM:
+/// `plasma/kcms/<name>` or `plasma/kcms/<folder>/<name>`, where `<folder>` is
+/// lower case letters, digits and `_` (`systemsettings`,
+/// `systemsettings_qwidgets`, `kinfocenter`). No `.`, `..` or empty parts, so
+/// the name can't be reached by walking out of the folder; only the last part
+/// is ever used.
+fn plugin_path_ok(raw: &str) -> bool {
+    if !raw.contains('/') {
+        return true;
+    }
+    let parts: Vec<&str> = raw.split('/').collect();
+    let folder_ok = |f: &str| {
+        !f.is_empty()
+            && f.bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+    };
+    match parts.as_slice() {
+        ["plasma", "kcms", _name] => true,
+        ["plasma", "kcms", folder, _name] => folder_ok(folder),
+        _ => false,
+    }
 }
 
 /// Where `name` (already [normalized](normalize)) leads.
@@ -132,6 +154,11 @@ mod tests {
             Some("kcm_kscreen")
         );
         assert_eq!(
+            normalize("plasma/kcms/systemsettings_qwidgets/kcm_fonts.desktop").as_deref(),
+            Some("kcm_fonts")
+        );
+        assert_eq!(normalize("plasma/kcms/kcm_x").as_deref(), Some("kcm_x"));
+        assert_eq!(
             normalize("kcm_recentFiles").as_deref(),
             Some("kcm_recentFiles")
         );
@@ -166,6 +193,20 @@ mod tests {
             "-kcm_x",
             "kcm_x\n",
             "--args",
+            // Paths other than Plasma's plugin folders, or walking out of them.
+            "plasma/kcms/../../../bin/kcm_x",
+            "plasma/kcms/systemsettings/../kcm_x",
+            "plasma/kcms/./kcm_x",
+            "plasma/kcms//kcm_x",
+            "plasma/kcms/",
+            "plasma/kcms/systemsettings/",
+            "plasma/kcms/a/b/kcm_x",
+            "plasma/kcms/Sys/kcm_x",
+            "plasma/kcms/sys-tem/kcm_x",
+            "plasma/kcm_x",
+            "/plasma/kcms/kcm_x",
+            "plasma/kcms/systemsettings/kcm_x/",
+            "kde/plasma/kcms/kcm_x",
         ] {
             assert_eq!(normalize(bad), None, "{bad:?}");
         }
