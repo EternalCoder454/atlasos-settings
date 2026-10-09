@@ -128,6 +128,36 @@ const MAKERS: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// The web search an unknown maker gets.
+const SEARCH_HOST: &str = "duckduckgo.com";
+
+/// Whether `url` is one the support button may open: `https://`, on the host
+/// of one of the [`MAKERS`]' pages or of the web search, with no user name,
+/// port or odd characters, so nothing a firmware string says can send the
+/// browser anywhere else.
+pub fn support_url_allowed(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let (host, path) = match rest.find(['/', '?']) {
+        Some(i) => rest.split_at(i),
+        None => (rest, ""),
+    };
+    let host_ok = host == SEARCH_HOST
+        || MAKERS.iter().any(|(_, _, page)| {
+            page.strip_prefix("https://")
+                .and_then(|r| r.split(['/', '?']).next())
+                == Some(host)
+        });
+    // Printable ASCII, and none of the characters a browser or a shell treats
+    // as more than text.
+    host_ok
+        && url.len() <= 512
+        && path
+            .bytes()
+            .all(|b| (0x21..=0x7e).contains(&b) && !b"\\\"<>`{}|^".contains(&b))
+}
+
 /// DMI strings that mean "the maker did not fill this in".
 fn placeholder(s: &str) -> bool {
     let l = s.to_lowercase();
@@ -180,6 +210,7 @@ pub fn support(sys_vendor: &str, board_vendor: &str, model: &str) -> Support {
             .iter()
             .find(|(key, _, _)| w.iter().any(|x| x.starts_with(key)))
         {
+            debug_assert!(support_url_allowed(url), "{url}");
             return Support {
                 name: (*name).into(),
                 url: (*url).into(),
@@ -200,9 +231,17 @@ pub fn support(sys_vendor: &str, board_vendor: &str, model: &str) -> Support {
     .copied()
     .collect::<Vec<_>>()
     .join(" ");
+    // The firmware's words are data in a query, percent-encoded; they never
+    // reach the host or the path. A query too long to be a search is cut (at
+    // 120 bytes, so the link is under 400 characters).
+    let mut cut = query.len().min(120);
+    while !query.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    let query = &query[..cut];
     Support {
         name: String::new(),
-        url: format!("https://duckduckgo.com/?q={}", percent_encode(&query)),
+        url: format!("https://{SEARCH_HOST}/?q={}", percent_encode(query)),
     }
 }
 
@@ -688,6 +727,64 @@ mod tests {
         // a maker's name only inside a word is not that maker
         assert_eq!(support("Chpwidgets", "", "").name, "");
         assert_eq!(support("Shell Dell Co", "", "").name, "Dell");
+    }
+
+    #[test]
+    fn only_makers_support_sites_and_the_search_are_opened() {
+        for ok in [
+            "https://www.asrock.com/support/",
+            "https://support.hp.com/",
+            "https://knowledgebase.frame.work/",
+            "https://www.msi.com/support",
+            "https://duckduckgo.com/?q=Acme%20BIOS%20update",
+        ] {
+            assert!(support_url_allowed(ok), "{ok}");
+        }
+        for bad in [
+            "",
+            "http://www.asrock.com/support/",
+            "ftp://www.asrock.com/",
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+            "https://evil.example/",
+            "https://www.asrock.com.evil.example/support/",
+            "https://evil.example/www.asrock.com/",
+            "https://www.asrock.com@evil.example/",
+            "https://user@www.asrock.com/",
+            "https://www.asrock.com:8443/support/",
+            "https://www.asrock.com\\@evil.example/",
+            "https://www.asrock.com/sup port",
+            "https://www.asrock.com/\u{1b}[2J",
+            "https://www.asrock.com/\"onclick=x",
+            "https://WWW.ASROCK.COM/support/",
+            "HTTPS://www.asrock.com/",
+            "https://dell.com/",
+            "https://duckduckgo.com.evil.example/?q=x",
+        ] {
+            assert!(!support_url_allowed(bad), "{bad}");
+        }
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig { failure_persistence: None, ..proptest::prelude::ProptestConfig::default() })]
+
+        /// Whatever the firmware calls itself, the support button opens an
+        /// allowed https page, and the firmware's text is only ever data in
+        /// the search's query.
+        #[test]
+        fn firmware_text_never_picks_the_page(
+            sys in "\\PC{0,80}",
+            board in "\\PC{0,80}",
+            model in "\\PC{0,300}",
+        ) {
+            let s = support(&sys, &board, &model);
+            proptest::prop_assert!(support_url_allowed(&s.url), "{}", s.url);
+            if s.name.is_empty() {
+                proptest::prop_assert!(s.url.starts_with("https://duckduckgo.com/?q="));
+                let q = &s.url["https://duckduckgo.com/?q=".len()..];
+                proptest::prop_assert!(q.bytes().all(|b| b.is_ascii_alphanumeric() || b"-._~%".contains(&b)), "{q}");
+            }
+        }
     }
 
     #[test]

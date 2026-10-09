@@ -203,12 +203,25 @@ fn fs_name(entry: &str) -> &str {
     entry.split(':').next().unwrap_or(entry)
 }
 
+/// The text of the file at `path`, when it is a regular file of at most
+/// [`MAX_FILE`] bytes. It is opened once and what was opened is what is read
+/// (a file swapped in after the size check can't be bigger), and a pipe or a
+/// device in its place is not waited for. A link to a regular file is
+/// followed: people keep their override files in a dotfiles folder.
 fn read_limited(path: &Path) -> Option<String> {
-    let f = fs::File::open(path).ok()?;
-    if f.metadata().ok()?.len() > MAX_FILE {
+    use std::io::Read;
+    let f = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
+        .open(path)
+        .ok()?;
+    let meta = f.metadata().ok()?;
+    if !meta.is_file() || meta.len() > MAX_FILE {
         return None;
     }
-    fs::read_to_string(path).ok()
+    let mut text = String::new();
+    f.take(MAX_FILE + 1).read_to_string(&mut text).ok()?;
+    (text.len() as u64 <= MAX_FILE).then_some(text)
 }
 
 fn theme_icon(icon: &str) -> String {
@@ -453,6 +466,115 @@ mod tests {
         let base = ["a".to_string(), "b".to_string()];
         assert_eq!(apply(&base, &["!a".into(), "c".into()]), ["b", "c"]);
         assert_eq!(apply(&base, &["b".into()]), ["a", "b"]);
+    }
+
+    /// A scratch folder of this test's own.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "settings-sys-flatpak-{name}-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn only_small_regular_files_are_read() {
+        let dir = scratch("read");
+        let small = dir.join("small");
+        fs::write(&small, "[Context]\nshared=network;\n").unwrap();
+        assert_eq!(
+            read_limited(&small).as_deref(),
+            Some("[Context]\nshared=network;\n")
+        );
+        // At the limit, and one over.
+        let exact = dir.join("exact");
+        fs::write(&exact, vec![b'a'; MAX_FILE as usize]).unwrap();
+        assert_eq!(
+            read_limited(&exact).map(|t| t.len()),
+            Some(MAX_FILE as usize)
+        );
+        let over = dir.join("over");
+        fs::write(&over, vec![b'a'; MAX_FILE as usize + 1]).unwrap();
+        assert_eq!(read_limited(&over), None);
+        // Not text.
+        let binary = dir.join("binary");
+        fs::write(&binary, [0xFF, 0xFE, 0x00, 0x80]).unwrap();
+        assert_eq!(read_limited(&binary), None);
+        // Missing, a folder, a device.
+        assert_eq!(read_limited(&dir.join("missing")), None);
+        assert_eq!(read_limited(&dir), None);
+        assert_eq!(read_limited(Path::new("/dev/zero")), None);
+        // A link to a regular file is the file (dotfiles folders).
+        let link = dir.join("link");
+        std::os::unix::fs::symlink(&small, &link).unwrap();
+        assert!(read_limited(&link).is_some());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_pipe_in_place_of_a_file_is_not_waited_for() {
+        let dir = scratch("pipe");
+        let fifo = dir.join("global");
+        let c = std::ffi::CString::new(fifo.to_str().unwrap()).unwrap();
+        // SAFETY: a valid NUL-terminated path.
+        assert_eq!(unsafe { libc::mkfifo(c.as_ptr(), 0o600) }, 0);
+        let started = std::time::Instant::now();
+        assert_eq!(read_limited(&fifo), None);
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+        // The whole listing survives it: no overrides, nothing blocked.
+        let roots = Roots {
+            installations: vec![],
+            overrides: dir.clone(),
+        };
+        let kf = Flatpak::new(roots).read_override("global");
+        assert!(kf.is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn overrides_are_written_whole_and_not_through_a_link() {
+        let dir = scratch("write");
+        let overrides = dir.join("overrides");
+        fs::create_dir_all(&overrides).unwrap();
+        // Something else's file that a link in the folder points at.
+        let precious = dir.join("precious");
+        fs::write(&precious, "keep me\n").unwrap();
+        std::os::unix::fs::symlink(&precious, overrides.join("org.example.App")).unwrap();
+        let fp = Flatpak::new(Roots {
+            installations: vec![],
+            overrides: overrides.clone(),
+        });
+        let mut kf = KeyFile::default();
+        kf.set_list("Context", "shared", &["network".to_string()]);
+        fp.write_override("org.example.App", &kf).unwrap();
+        // The link is replaced by the new file; the file it pointed at is as it was.
+        assert_eq!(fs::read_to_string(&precious).unwrap(), "keep me\n");
+        let written = overrides.join("org.example.App");
+        assert!(
+            !fs::symlink_metadata(&written)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(
+            fs::read_to_string(&written).unwrap(),
+            "[Context]\nshared=network;\n"
+        );
+        // No half-written file is left beside it, and it is not group- or
+        // world-writable.
+        let names: Vec<_> = fs::read_dir(&overrides)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(names, ["org.example.App"]);
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(&written).unwrap().permissions().mode() & 0o022,
+            0
+        );
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
