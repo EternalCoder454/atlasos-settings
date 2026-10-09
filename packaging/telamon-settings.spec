@@ -214,6 +214,12 @@ if [ "$rc" != 2 ]; then
 fi
 appstream-util validate-relax --nonet \
     %{buildroot}%{_datadir}/metainfo/net.eterneon.telamon.settings.metainfo.xml
+# The programs carry the hardening the build flags give them (position
+# independent, full RELRO and BIND_NOW, no executable stack, no RPATH, stack
+# protectors in the C++), and the program has none of the tests' hooks: readelf
+# says, not the flags we meant.
+scripts/check-hardening.sh --cxx %{buildroot}%{_bindir}/telamon-settings
+scripts/check-hardening.sh %{buildroot}%{_bindir}/systemsettings
 
 %files
 %license LICENSE
