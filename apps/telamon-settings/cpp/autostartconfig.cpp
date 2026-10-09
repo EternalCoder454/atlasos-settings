@@ -57,6 +57,22 @@ QString systemFile(const QString &id)
     return {};
 }
 
+// Whether the user's file at `path` may be written: not there yet, a regular
+// file, or a link to a regular .desktop file (a dotfiles manager's). Never a
+// link to anything else, or to nothing: KConfig and QFile::copy write through
+// links, so a link someone else put in the folder (an app that may write
+// there, a name picked to look like an entry) would have Settings replace the
+// file it points at, a shell's startup file say.
+bool safeToWrite(const QString &path)
+{
+    const QFileInfo info(path);
+    if (info.isSymLink()) {
+        const QString target = info.canonicalFilePath();
+        return !target.isEmpty() && QFileInfo(target).isFile() && target.endsWith(u".desktop"_s);
+    }
+    return !info.exists() || info.isFile();
+}
+
 bool shownInPlasma(const KConfigGroup &g)
 {
     const QStringList only = g.readXdgListEntry("OnlyShowIn");
@@ -75,7 +91,7 @@ bool enabledIn(const KConfigGroup &g)
 // A theme icon name; a path or anything odd is not shown.
 QString iconName(const QString &icon)
 {
-    static const QRegularExpression ok(u"^[A-Za-z0-9._+-]{1,100}$"_s);
+    static const QRegularExpression ok(u"\\A[A-Za-z0-9._+-]{1,100}\\z"_s);
     return ok.match(icon).hasMatch() ? icon : u"application-x-executable"_s;
 }
 
@@ -87,7 +103,7 @@ QString cap(const QString &text, int max)
 
 bool AutostartConfig::validId(const QString &id)
 {
-    static const QRegularExpression re(u"^[A-Za-z0-9._-]{1,120}\\.desktop$"_s);
+    static const QRegularExpression re(u"\\A[A-Za-z0-9._-]{1,120}\\.desktop\\z"_s);
     return re.match(id).hasMatch() && !id.contains(u".."_s);
 }
 
@@ -170,7 +186,7 @@ bool AutostartConfig::setEnabled(const QString &id, bool on)
     }
     const QString path = userDir() + u'/' + id;
     const QString sys = systemFile(id);
-    if (!QDir().mkpath(userDir())) {
+    if (!QDir().mkpath(userDir()) || !safeToWrite(path)) {
         return false;
     }
     if (!on) {
@@ -239,6 +255,9 @@ bool AutostartConfig::add(const QString &id)
         return false;
     }
     const QString path = userDir() + u'/' + id;
+    if (!safeToWrite(path)) {
+        return false;
+    }
     if (QFileInfo::exists(path)) {
         return setEnabled(id, true);
     }

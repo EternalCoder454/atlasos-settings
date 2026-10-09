@@ -59,7 +59,7 @@ InputConfig::InputConfig(QObject *parent)
 
 bool InputConfig::validLayoutId(const QString &id)
 {
-    static const QRegularExpression re(u"^[A-Za-z0-9_-]{1,32}(\\([A-Za-z0-9_-]{1,32}\\))?$"_s);
+    static const QRegularExpression re(u"\\A[A-Za-z0-9_-]{1,32}(\\([A-Za-z0-9_-]{1,32}\\))?\\z"_s);
     return re.match(id).hasMatch();
 }
 
@@ -257,7 +257,7 @@ void InputConfig::refresh()
                               }
                               return;
                           }
-                          static const QRegularExpression valid(u"^[A-Za-z0-9_-]{1,32}$"_s);
+                          static const QRegularExpression valid(u"\\A[A-Za-z0-9_-]{1,32}\\z"_s);
                           QStringList names;
                           for (const QString &n : unwrap<QStringList>(reply.arguments().at(0))) {
                               if (valid.match(n).hasMatch() && names.size() < MaxDevices) {

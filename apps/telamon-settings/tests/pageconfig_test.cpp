@@ -108,6 +108,11 @@ private Q_SLOTS:
         write(dir("sys") + u"/wallpapers/AtlasOS/contents/screenshot.jpg"_s, "x");
         write(dir("sys") + u"/wallpapers/AtlasOS-Login/contents/screenshot.jpg"_s, "x");
         write(dir("sys") + u"/wallpapers/Bad'Name/contents/screenshot.jpg"_s, "x");
+        // Folders named like an option, a path or with a line break in them.
+        write(dir("sys") + u"/wallpapers/--help/contents/screenshot.jpg"_s, "x");
+        write(dir("sys") + u"/wallpapers/-x/contents/screenshot.jpg"_s, "x");
+        write(dir("sys") + u"/wallpapers/.hidden/contents/screenshot.jpg"_s, "x");
+        write(dir("sys") + u"/wallpapers/Two\nLines/contents/screenshot.jpg"_s, "x");
         write(dir("sys") + u"/plasma/look-and-feel/org.atlasos.dark.desktop/metadata.json"_s, R"({"KPlugin": {"Id": "org.atlasos.dark.desktop", "Name": "AtlasOS Dark", "Description": "d"}})");
         write(dir("sys") + u"/plasma/look-and-feel/org.evil.desktop/metadata.json"_s, R"({"KPlugin": {"Id": "../../etc", "Name": "x"}})");
         write(dir("pictures") + u"/photo.jpg"_s, "x");
@@ -253,6 +258,14 @@ private Q_SLOTS:
         QCOMPARE(run.last().at(0).toStringList().last(), u"TelamonDark"_s);
     }
 
+    void colorsAreCheckedToTheEnd()
+    {
+        QVERIFY(AppearanceConfig::validColor(u"#6858e2"_s));
+        QVERIFY(!AppearanceConfig::validColor(u"#6858e2\n"_s));
+        QVERIFY(!AppearanceConfig::validColor(u"#6858e2 "_s));
+        QVERIFY(!AppearanceConfig::validColor(u"#6858e"_s));
+    }
+
     void wallpapersOnlyKnownOnes()
     {
         AppearanceConfig cfg;
@@ -267,6 +280,14 @@ private Q_SLOTS:
         // offered.
         QVERIFY(!ids.contains(u"AtlasOS-Login"_s));
         QVERIFY(!ids.contains(u"Bad'Name"_s));
+        // ... nor are names a tool could read as an option, or that end in a
+        // line break (a regular expression's $ would have let that through).
+        for (const QString &bad : {u"--help"_s, u"-x"_s, u".hidden"_s, u"Two\nLines"_s, u"AtlasOS\n"_s}) {
+            QVERIFY2(!ids.contains(bad), qPrintable(bad));
+        }
+        for (const QString &id : ids) {
+            QVERIFY2(!id.startsWith(u'-'), qPrintable(id));
+        }
         QVERIFY(!ids.contains(dir("pictures") + u"/it's.jpg"_s));
         QCOMPARE(list.first().toMap().value(u"name"_s).toString(), u"AtlasOS Wave"_s);
 

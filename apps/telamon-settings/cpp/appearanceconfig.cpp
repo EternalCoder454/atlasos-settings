@@ -32,10 +32,12 @@ constexpr auto HighContrastLight = "TelamonHighContrastLight";
 constexpr auto HighContrastDark = "TelamonHighContrastDark";
 
 // A name a tool is given as a program argument: plain characters only, no
-// quote (plasma-apply-wallpaperimage builds a script around the name).
+// quote (plasma-apply-wallpaperimage builds a script around the name), and a
+// letter or digit first, so a folder somebody named "--help" or ".." can't be
+// read as an option (or a path) by the tool.
 bool plainName(const QString &name, int max = 100)
 {
-    static const QRegularExpression re(u"^[A-Za-z0-9._-]+$"_s);
+    static const QRegularExpression re(u"\\A[A-Za-z0-9][A-Za-z0-9._-]*\\z"_s);
     return !name.isEmpty() && name.size() <= max && re.match(name).hasMatch();
 }
 
@@ -329,7 +331,7 @@ QString AppearanceConfig::accentHex() const
 
 bool AppearanceConfig::validColor(const QString &hex)
 {
-    static const QRegularExpression re(u"^#[0-9a-fA-F]{6}$"_s);
+    static const QRegularExpression re(u"\\A#[0-9a-fA-F]{6}\\z"_s);
     return re.match(hex).hasMatch();
 }
 

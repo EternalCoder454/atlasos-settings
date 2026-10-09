@@ -215,14 +215,11 @@ add_library(telamon-settings-displays STATIC
     cpp/nightlight.cpp)
 target_include_directories(telamon-settings-displays PUBLIC cpp)
 target_link_libraries(telamon-settings-displays PUBLIC telamon-settings-text Qt6::Core Qt6::Gui Qt6::DBus KF6::ConfigCore KF6::Screen)
-# TELAMON_SETTINGS_FAKE_DISPLAYS=<json>: libkscreen's Fake backend instead of the
-# compositor, for the tests and the screenshots. It needs a private header of
-# libkscreen (backendmanager_p.h), so a libkscreen that drops it builds with
-# -DTELAMON_SETTINGS_TEST_HOOKS=OFF.
-option(TELAMON_SETTINGS_TEST_HOOKS "Build the fake-screens hook for tests" ON)
-if(TELAMON_SETTINGS_TEST_HOOKS)
-    target_compile_definitions(telamon-settings-displays PUBLIC TELAMON_SETTINGS_TEST_HOOKS)
-endif()
+# TELAMON_SETTINGS_FAKE_DISPLAYS=<file>: libkscreen's Fake backend instead of
+# the compositor, for the tests and the screenshots. That hook is compiled into
+# a copy of the screens' code that only the tests link
+# (telamon-settings-displays-hooks, below); the app and the package never have
+# it, so no environment variable can swap the real screens for fake ones.
 target_link_libraries(telamon-settings-app PRIVATE telamon-settings-displays)
 
 # Sound's C++: PulseAudio's API on PipeWire, through PulseAudioQt (Plasma's own
@@ -237,6 +234,20 @@ target_link_libraries(telamon-settings-app PRIVATE telamon-settings-sound)
 
 # The C++ logic's tests (Qt Test, offscreen): `ctest --test-dir <build>`.
 option(TELAMON_SETTINGS_TESTS "Build the C++ tests" ON)
+# The fake-screens hook needs a private header of libkscreen
+# (backendmanager_p.h), so a libkscreen that drops it builds with
+# -DTELAMON_SETTINGS_TEST_HOOKS=OFF. Tests only: never part of the app.
+option(TELAMON_SETTINGS_TEST_HOOKS "Build the fake-screens hook for tests" ON)
+if(TELAMON_SETTINGS_TESTS AND TELAMON_SETTINGS_TEST_HOOKS)
+    add_library(telamon-settings-displays-hooks STATIC
+        cpp/displaylogic.cpp
+        cpp/reverttimer.cpp
+        cpp/screenconfig.cpp
+        cpp/nightlight.cpp)
+    target_include_directories(telamon-settings-displays-hooks PUBLIC cpp)
+    target_link_libraries(telamon-settings-displays-hooks PUBLIC telamon-settings-text Qt6::Core Qt6::Gui Qt6::DBus KF6::ConfigCore KF6::Screen)
+    target_compile_definitions(telamon-settings-displays-hooks PUBLIC TELAMON_SETTINGS_TEST_HOOKS)
+endif()
 if(TELAMON_SETTINGS_TESTS)
     enable_testing()
     add_subdirectory(tests)
@@ -282,6 +293,8 @@ if(TELAMON_SETTINGS_TESTS)
     find_package(Qt6 6.11 REQUIRED COMPONENTS Test)
     enable_testing()
     add_executable(configtests tests/configtests.cpp
+        cpp/colorscheme.cpp
+        cpp/localeconfig.cpp
         cpp/powerconfig.cpp
         cpp/screenlockconfig.cpp
         cpp/autostartconfig.cpp

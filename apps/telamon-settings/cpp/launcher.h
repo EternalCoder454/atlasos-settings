@@ -15,13 +15,20 @@ public:
     using QObject::QObject;
 
     // Starts argv[0], a program in /usr/bin found by name (never PATH), with
-    // the rest as its arguments and no shell between. False at once for an
-    // empty list; a program that is missing, or can't be started, is
-    // reported through failed(). The same command again within 2 s (a double
+    // the rest as its arguments and no shell between. Only the programs
+    // Settings itself starts are allowed (allowedProgram()): whatever a page
+    // or a launch argument might one day put in argv[0], a shell or an
+    // interpreter is not started. False at once for an empty list or a
+    // program that is not allowed; a program that is missing, or can't be
+    // started, is reported through failed(). The same command again within 2 s (a double
     // click, a link sent twice) is not started again, and no more than
     // MaxStarts programs start in any 10 s (links from other programs can
     // ask for them).
     Q_INVOKABLE bool run(const QStringList &argv);
+
+    // The programs run() starts, by name: Plasma's KCM launcher and its
+    // apply tools, gsettings (the screen reader switch) and Telamon Store.
+    static bool allowedProgram(const QString &name);
 
     // Starts the first of `desktopNames` that is installed (desktop file IDs
     // without ".desktop", such as "org.kde.plasma.camera"), from its desktop

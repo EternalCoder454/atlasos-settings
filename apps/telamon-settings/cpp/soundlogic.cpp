@@ -85,7 +85,7 @@ QString appIcon(const QVariantMap &streamProperties)
 {
     const QString name = streamProperties.value(QStringLiteral("application.icon_name")).toString();
     // A theme icon's name, never a path.
-    static const QRegularExpression valid(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"));
+    static const QRegularExpression valid(QStringLiteral("\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z"));
     return valid.match(name).hasMatch() ? name : QString();
 }
 }
