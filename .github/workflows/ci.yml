@@ -145,6 +145,17 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Tests
         run: cargo test --workspace --locked
+      # The parsers that read what other programs send (launch arguments, deep
+      # links, the systemsettings command line) with far more random and
+      # option-shaped input than a local run uses (docs/SECURITY.md). A failure
+      # prints the input that broke the rule.
+      - name: Parser property tests, long run
+        timeout-minutes: 10
+        env:
+          PROPTEST_CASES: 20000
+        run: |
+          cargo test --locked -p settings-registry --test fuzz_launch
+          cargo test --locked -p systemsettings-shim --test fuzz_plan
 
   # The release build, as Telamon OS builds it. Its CMake build (Corrosion's cargo
   # target in it) is cached, so it compiles only what changed.
