@@ -434,10 +434,12 @@ SettingsPage {
     FileDialog {
         id: pictureDialog
         title: qsTr("Choose a Picture")
-        nameFilters: [qsTr("Pictures (*.png *.jpg *.jpeg *.webp *.gif *.svg)")]
+        nameFilters: [qsTr("Pictures (*.png *.jpg *.jpeg *.webp *.gif)")]
         onAccepted: {
             const path = page.fileUrlToPath(selectedFile);
-            if (page.sys && page.sys.validPicture(path))
+            // The file is looked at on a worker thread; what is wrong with a
+            // file that won't do is shown in the banner.
+            if (page.sys)
                 page.sys.changePicture(page.sys.meUid, path);
         }
     }

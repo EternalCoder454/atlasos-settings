@@ -1,13 +1,17 @@
 //! AccountsService (`org.freedesktop.Accounts`): the people who use this
 //! computer. Every change is the service's own polkit action
 //! (`org.freedesktop.accounts.*`); passwords go to the service as a crypt(3)
-//! hash, as the KDE users page sends them, and are held only for the call
-//! and never logged.
+//! hash (yescrypt, as Fedora stores them; SHA-512 where libcrypt has no
+//! yescrypt), as the KDE users page sends them, and are held only for the
+//! call and never logged. A picture is looked at before the service is asked
+//! to copy it ([`check_picture`]).
 
 use crate::bus::{Bus, INTERACTIVE_TIMEOUT};
 use crate::error::clean;
 use crate::{Error, ErrorKind};
-use std::ffi::{CStr, CString, c_char};
+use std::ffi::{CStr, CString, c_char, c_int, c_ulong};
+use std::io::Read;
+use std::os::unix::fs::OpenOptionsExt;
 use std::sync::Mutex;
 use zbus::blocking::{Connection, Proxy};
 use zbus::proxy::MethodFlags;
@@ -21,8 +25,11 @@ const USER_IFACE: &str = "org.freedesktop.Accounts.User";
 pub const MAX_USERS: usize = 64;
 /// The longest full name, in characters.
 pub const MAX_REAL_NAME: usize = 128;
-/// The longest password accepted, in bytes.
-pub const MAX_PASSWORD: usize = 1024;
+/// The longest password accepted, in bytes: libcrypt's own limit
+/// (`CRYPT_MAX_PASSPHRASE_SIZE` is 512, counting the NUL), above which it
+/// hashes nothing. A longer one is refused here, up front, not after the
+/// account was created.
+pub const MAX_PASSWORD: usize = 511;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct User {
@@ -85,58 +92,198 @@ pub fn valid_icon_path(path: &str) -> bool {
             .any(|e| lower.ends_with(e))
 }
 
+/// What the detail of a `Refused` error from [`Accounts::set_icon`] starts
+/// with when the picture itself was the problem; the rest is a sentence for
+/// the page.
+pub const PICTURE_PREFIX: &str = "picture: ";
+
+/// The largest picture AccountsService copies (it refuses more than 1 MB).
+pub const MAX_PICTURE: u64 = 1024 * 1024;
+
+/// The kind of picture file `head` (the first bytes of a file) is, when it is
+/// one AccountsService and the sign-in screen can show: PNG, JPEG, GIF or
+/// WebP, by what the file holds, not what it is called. Not SVG: a picture
+/// the login screen draws should not be a document with a mind of its own.
+pub fn picture_kind(head: &[u8]) -> Option<&'static str> {
+    if head.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
+        Some("png")
+    } else if head.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpeg")
+    } else if head.starts_with(b"GIF87a") || head.starts_with(b"GIF89a") {
+        Some("gif")
+    } else if head.len() >= 12 && &head[..4] == b"RIFF" && &head[8..12] == b"WEBP" {
+        Some("webp")
+    } else {
+        None
+    }
+}
+
+/// Looks at the file the person chose before AccountsService is asked to
+/// copy it as their picture, and returns the path to give it: the file with
+/// links followed (the service then opens what was looked at, not a link that
+/// could be pointed elsewhere meanwhile). It must be a regular file, not
+/// empty, at most [`MAX_PICTURE`], and a PNG, JPEG, GIF or WebP by its
+/// contents. The service still does its own checks as the user the picture is
+/// for; these tell the person why, and keep a link to a device, a pipe or a
+/// secret from ever being handed on. The reason is a sentence for the page.
+pub fn check_picture(file: &str) -> Result<String, &'static str> {
+    if !valid_icon_path(file) {
+        return Err("That isn't a picture file.");
+    }
+    let resolved = std::fs::canonicalize(file).map_err(|_| "Settings can't find that file.")?;
+    let resolved = resolved
+        .to_str()
+        .ok_or("Settings can't use that file's name.")?
+        .to_string();
+    if resolved.chars().any(char::is_control) || resolved.len() > 4096 {
+        return Err("Settings can't use that file's name.");
+    }
+    // No link at the end (it was resolved; one swapped in since is refused),
+    // and no waiting on a pipe or a device.
+    let mut f = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC)
+        .open(&resolved)
+        .map_err(|_| "Settings can't read that file.")?;
+    let meta = f.metadata().map_err(|_| "Settings can't read that file.")?;
+    if !meta.is_file() {
+        return Err("That isn't a picture file.");
+    }
+    if meta.len() == 0 {
+        return Err("That file is empty.");
+    }
+    if meta.len() > MAX_PICTURE {
+        return Err("That picture is bigger than 1 MB. Choose a smaller one.");
+    }
+    let mut head = [0u8; 12];
+    let mut n = 0;
+    while n < head.len() {
+        match f.read(&mut head[n..]) {
+            Ok(0) => break,
+            Ok(k) => n += k,
+            Err(_) => return Err("Settings can't read that file."),
+        }
+    }
+    if picture_kind(&head[..n]).is_none() {
+        return Err("Choose a PNG, JPEG, WebP or GIF picture.");
+    }
+    Ok(resolved)
+}
+
 #[link(name = "crypt")]
 unsafe extern "C" {
     fn crypt(key: *const c_char, salt: *const c_char) -> *const c_char;
+    fn crypt_gensalt_rn(
+        prefix: *const c_char,
+        count: c_ulong,
+        rbytes: *const c_char,
+        nrbytes: c_int,
+        output: *mut c_char,
+        output_size: c_int,
+    ) -> *mut c_char;
+}
+
+/// Overwrites `bytes` in a way the compiler may not drop.
+fn wipe(bytes: &mut [u8]) {
+    for b in bytes.iter_mut() {
+        // SAFETY: a valid, aligned reference to a byte.
+        unsafe { std::ptr::write_volatile(b, 0) };
+    }
+    std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+}
+
+/// A crypt(3) setting string (algorithm, cost and a random salt) for `prefix`
+/// (`$y$` yescrypt, `$6$` SHA-512), made by libcrypt from random bytes of
+/// the kernel's. `None` when libcrypt doesn't have that algorithm.
+fn gensalt(prefix: &CStr, count: c_ulong) -> Result<Option<CString>, Error> {
+    let mut random = [0u8; 64];
+    std::fs::File::open("/dev/urandom")
+        .and_then(|mut f| f.read_exact(&mut random))
+        .map_err(|e| Error::new(ErrorKind::Refused, format!("no random numbers: {e}")))?;
+    let mut out = vec![0u8; 192];
+    // SAFETY: `random` and `out` are valid for the lengths given and the
+    // prefix is NUL-terminated; libcrypt writes a NUL-terminated string to
+    // `out` or returns null.
+    let made = unsafe {
+        crypt_gensalt_rn(
+            prefix.as_ptr(),
+            count,
+            random.as_ptr().cast(),
+            random.len() as c_int,
+            out.as_mut_ptr().cast(),
+            out.len() as c_int,
+        )
+    };
+    wipe(&mut random);
+    if made.is_null() {
+        return Ok(None);
+    }
+    // SAFETY: success: `out` holds a NUL-terminated string.
+    let setting = unsafe { CStr::from_ptr(out.as_ptr().cast()) }.to_owned();
+    Ok(Some(setting))
 }
 
 /// crypt(3) is not reentrant.
 static CRYPT: Mutex<()> = Mutex::new(());
 
-const SALT_CHARS: &[u8] = b"./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-
-fn random_salt() -> Result<String, Error> {
-    use std::io::Read;
-    let mut bytes = [0u8; 16];
-    std::fs::File::open("/dev/urandom")
-        .and_then(|mut f| f.read_exact(&mut bytes))
-        .map_err(|e| Error::new(ErrorKind::Refused, format!("no random numbers: {e}")))?;
-    let salt: String = bytes
-        .iter()
-        .map(|b| SALT_CHARS[(*b as usize) % SALT_CHARS.len()] as char)
-        .collect();
-    Ok(format!("$6${salt}"))
+/// `crypt(key, setting)` as a string; `None` when libcrypt refuses.
+fn crypt_with(key: &CStr, setting: &CStr) -> Option<String> {
+    let _guard = CRYPT.lock().unwrap_or_else(|e| e.into_inner());
+    // SAFETY: both are NUL-terminated; the result points into libcrypt's
+    // buffer, which is copied before the lock is released.
+    unsafe {
+        let p = crypt(key.as_ptr(), setting.as_ptr());
+        if p.is_null() {
+            None
+        } else {
+            Some(CStr::from_ptr(p).to_string_lossy().into_owned())
+        }
+    }
 }
 
-/// The SHA-512 crypt(3) hash of `password` with a random salt, as
-/// AccountsService's `SetPassword` takes it.
+/// The crypt(3) hash of `password` with a random salt, as AccountsService's
+/// `SetPassword` takes it: yescrypt (`$y$`, a memory-hard hash, what Fedora's
+/// shadow file holds), else SHA-512 with 100,000 rounds where libcrypt has
+/// no yescrypt. The hash is checked by hashing the password again with it
+/// before it is returned.
 pub fn hash_password(password: &str) -> Result<String, Error> {
     if password.is_empty() || password.len() > MAX_PASSWORD || password.contains('\0') {
         return Err(Error::new(ErrorKind::Refused, "not a usable password"));
     }
     let key = CString::new(password)
         .map_err(|_| Error::new(ErrorKind::Refused, "not a usable password"))?;
-    let salt =
-        CString::new(random_salt()?).map_err(|_| Error::new(ErrorKind::Refused, "bad salt"))?;
-    let _guard = CRYPT.lock().unwrap_or_else(|e| e.into_inner());
-    // SAFETY: both are NUL-terminated; the result points into libcrypt's
-    // buffer, which is copied before the lock is released.
-    let out = unsafe {
-        let p = crypt(key.as_ptr(), salt.as_ptr());
-        if p.is_null() {
-            None
-        } else {
-            Some(CStr::from_ptr(p).to_string_lossy().into_owned())
+    // The key is overwritten when done, whichever way this ends.
+    struct Wiped(Option<CString>);
+    impl Drop for Wiped {
+        fn drop(&mut self) {
+            if let Some(k) = self.0.take() {
+                let mut bytes = k.into_bytes_with_nul();
+                wipe(&mut bytes);
+                std::hint::black_box(&bytes);
+            }
         }
-    };
-    match out {
-        // "*0" and "*1" are crypt's failure answers.
-        Some(h) if h.starts_with("$6$") => Ok(h),
-        _ => Err(Error::new(
-            ErrorKind::Refused,
-            "hashing the password failed",
-        )),
     }
+    let key = Wiped(Some(key));
+    let key_ref = key.0.as_deref().expect("just set");
+    for (prefix, count) in [(c"$y$", 0), (c"$6$", 100_000)] {
+        let Some(setting) = gensalt(prefix, count)? else {
+            continue;
+        };
+        let want = prefix.to_str().unwrap_or_default();
+        // "*0" and "*1" are crypt's failure answers.
+        let Some(hash) = crypt_with(key_ref, &setting).filter(|h| h.starts_with(want)) else {
+            continue;
+        };
+        let again = CString::new(hash.as_str())
+            .map_err(|_| Error::new(ErrorKind::Refused, "hashing the password failed"))?;
+        if crypt_with(key_ref, &again).as_deref() == Some(hash.as_str()) {
+            return Ok(hash);
+        }
+    }
+    Err(Error::new(
+        ErrorKind::Refused,
+        "hashing the password failed",
+    ))
 }
 
 pub struct Accounts {
@@ -233,12 +380,14 @@ impl Accounts {
         self.interactive_call(&path, "SetRealName", &(name.trim(),))
     }
 
+    /// Gives the user the picture in `file`, which [`check_picture`] has
+    /// looked at first (a `Refused` error whose detail is `picture: ` and the
+    /// reason when it won't do).
     pub fn set_icon(&self, uid: u64, file: &str) -> Result<(), Error> {
-        if !valid_icon_path(file) {
-            return Err(Error::new(ErrorKind::Refused, "not a picture file"));
-        }
+        let file = check_picture(file)
+            .map_err(|why| Error::new(ErrorKind::Refused, format!("{PICTURE_PREFIX}{why}")))?;
         let path = self.path_of(uid)?;
-        self.interactive_call(&path, "SetIconFile", &(file,))
+        self.interactive_call(&path, "SetIconFile", &(file.as_str(),))
     }
 
     pub fn set_admin(&self, uid: u64, admin: bool) -> Result<(), Error> {
@@ -377,16 +526,212 @@ mod tests {
     }
 
     #[test]
-    fn password_hashes_are_sha512_crypt() {
+    fn password_hashes_are_slow_salted_and_check_out() {
         let a = hash_password("correct horse").expect("hash");
         let b = hash_password("correct horse").expect("hash");
-        assert!(a.starts_with("$6$"), "{a}");
-        // 86 characters of hash after "$6$<16 salt>$".
-        assert_eq!(a.len(), 3 + 16 + 1 + 86, "{a}");
+        // yescrypt where libcrypt has it (Fedora's does), else SHA-512.
+        assert!(a.starts_with("$y$") || a.starts_with("$6$"), "{a}");
         assert_ne!(a, b, "a new salt each time");
         assert!(!a.contains("correct"));
+        // The hash as the setting gives the hash back for the password, and
+        // another for any other.
+        let right = CString::new("correct horse").unwrap();
+        let wrong = CString::new("correct horsf").unwrap();
+        let setting = CString::new(a.as_str()).unwrap();
+        assert_eq!(crypt_with(&right, &setting).as_deref(), Some(a.as_str()));
+        assert_ne!(crypt_with(&wrong, &setting).as_deref(), Some(a.as_str()));
+        // A hash AccountsService can write to the shadow file's field: no
+        // colon, no whitespace, nothing but crypt(3)'s alphabet and `$`.
+        assert!(
+            a.bytes()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'$' | b'.' | b'/')),
+            "{a}"
+        );
         assert!(hash_password("").is_err());
         assert!(hash_password(&"x".repeat(MAX_PASSWORD + 1)).is_err());
         assert!(hash_password("a\0b").is_err());
+        // A long password and one that is not ASCII.
+        assert!(hash_password(&"x".repeat(MAX_PASSWORD)).is_ok());
+        assert!(hash_password("pässwörd ✓").is_ok());
+    }
+
+    #[test]
+    fn sha512_stays_available_as_the_fallback() {
+        // libcrypt always has it: the setting the fallback uses is good.
+        let setting = gensalt(c"$6$", 100_000).expect("random").expect("sha512");
+        assert!(setting.to_str().unwrap().starts_with("$6$rounds=100000$"));
+        let hash = crypt_with(c"pw", &setting).expect("hash");
+        assert!(hash.starts_with("$6$rounds=100000$"), "{hash}");
+    }
+
+    /// A scratch folder of this test's own.
+    struct Scratch(std::path::PathBuf);
+    impl Scratch {
+        fn new(name: &str) -> Scratch {
+            let dir =
+                std::env::temp_dir().join(format!("settings-sys-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            Scratch(dir)
+        }
+        fn file(&self, name: &str, bytes: &[u8]) -> String {
+            let p = self.0.join(name);
+            std::fs::write(&p, bytes).unwrap();
+            p.to_str().unwrap().to_string()
+        }
+        fn path(&self, name: &str) -> String {
+            self.0.join(name).to_str().unwrap().to_string()
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0];
+
+    #[test]
+    fn picture_kinds_are_told_by_contents() {
+        assert_eq!(picture_kind(PNG), Some("png"));
+        assert_eq!(picture_kind(&[0xFF, 0xD8, 0xFF, 0xE0]), Some("jpeg"));
+        assert_eq!(picture_kind(b"GIF89a\x01\0"), Some("gif"));
+        assert_eq!(picture_kind(b"GIF87a"), Some("gif"));
+        assert_eq!(picture_kind(b"RIFF\x10\0\0\0WEBPVP8 "), Some("webp"));
+        for not in [
+            &b""[..],
+            b"RIFF\x10\0\0\0WAVEfmt ",
+            b"RIFF",
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+            b"<?xml version=\"1.0\"?><svg/>",
+            b"\x7fELF\x02\x01\x01",
+            b"#!/bin/sh\n",
+            b"GIF88a",
+            b"\x89PNG\r\n\x1a",
+        ] {
+            assert_eq!(picture_kind(not), None, "{not:?}");
+        }
+    }
+
+    #[test]
+    fn a_picture_is_checked_before_the_service_is_asked() {
+        let dir = Scratch::new("picture");
+        let real = std::fs::canonicalize(&dir.0).unwrap();
+        // The pictures the service takes, wherever the extension says.
+        let png = dir.file("me.png", PNG);
+        assert_eq!(
+            check_picture(&png).unwrap(),
+            real.join("me.png").to_str().unwrap()
+        );
+        assert!(check_picture(&dir.file("photo.JPG", &[0xFF, 0xD8, 0xFF, 0xE0])).is_ok());
+        assert!(check_picture(&dir.file("a.webp", b"RIFF\0\0\0\0WEBPVP8 ")).is_ok());
+        assert!(check_picture(&dir.file("no-extension.png", b"GIF89a....")).is_ok());
+
+        // Not a picture, whatever it is called.
+        for (name, bytes) in [
+            ("text.png", &b"hello there\n"[..]),
+            ("script.png", b"#!/bin/sh\nrm -rf ~\n"),
+            ("elf.jpg", b"\x7fELF\x02\x01\x01\0"),
+            ("vector.svg", b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"),
+            ("empty.png", b""),
+        ] {
+            let path = dir.file(name, bytes);
+            assert!(check_picture(&path).is_err(), "{name}");
+        }
+        assert_eq!(
+            check_picture(&dir.file("empty2.png", b"")).unwrap_err(),
+            "That file is empty."
+        );
+        assert!(check_picture(&dir.path("missing.png")).is_err());
+        // Not a path the service may be given at all.
+        for bad in [
+            "",
+            "me.png",
+            "../me.png",
+            "/a/../b.png",
+            "/tmp/a\nb.png",
+            "/etc/shadow",
+        ] {
+            assert!(check_picture(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn a_picture_is_at_most_a_megabyte() {
+        let dir = Scratch::new("picture-size");
+        let exact = dir.path("exact.png");
+        let mut bytes = PNG.to_vec();
+        bytes.resize(MAX_PICTURE as usize, 0);
+        std::fs::write(&exact, &bytes).unwrap();
+        assert!(check_picture(&exact).is_ok());
+        bytes.push(0);
+        let over = dir.path("over.png");
+        std::fs::write(&over, &bytes).unwrap();
+        assert_eq!(
+            check_picture(&over).unwrap_err(),
+            "That picture is bigger than 1 MB. Choose a smaller one."
+        );
+        // A huge sparse file is looked at by its size, never read.
+        let huge = dir.path("huge.png");
+        let f = std::fs::File::create(&huge).unwrap();
+        if f.set_len(8 << 30).is_ok() {
+            assert!(check_picture(&huge).is_err());
+        }
+    }
+
+    #[test]
+    fn links_are_followed_to_the_file_that_was_checked() {
+        use std::os::unix::fs::symlink;
+        let dir = Scratch::new("picture-links");
+        let real = std::fs::canonicalize(&dir.0).unwrap();
+        let png = dir.file("real.png", PNG);
+        // A link to a picture is fine, and the path handed on is the picture's.
+        let link = dir.path("link.png");
+        symlink(&png, &link).unwrap();
+        assert_eq!(
+            check_picture(&link).unwrap(),
+            real.join("real.png").to_str().unwrap()
+        );
+        // A link that points at something else is judged by that: a secret
+        // named like a picture is not one...
+        let secret = dir.file("secret", b"root:$6$salt$hash:19000::::::\n");
+        let sneaky = dir.path("sneaky.png");
+        symlink(&secret, &sneaky).unwrap();
+        assert!(check_picture(&sneaky).is_err());
+        let shadow = dir.path("shadow.png");
+        symlink("/etc/shadow", &shadow).unwrap();
+        assert!(check_picture(&shadow).is_err());
+        // ... a link to a folder or a device is not a file ...
+        let folder = dir.path("folder.png");
+        symlink(&dir.0, &folder).unwrap();
+        assert!(check_picture(&folder).is_err());
+        let device = dir.path("device.png");
+        symlink("/dev/zero", &device).unwrap();
+        assert!(check_picture(&device).is_err());
+        // ... and one that leads nowhere, or round in a circle, is refused.
+        let dangling = dir.path("dangling.png");
+        symlink(dir.path("nowhere"), &dangling).unwrap();
+        assert!(check_picture(&dangling).is_err());
+        let a = dir.path("a.png");
+        let b = dir.path("b.png");
+        symlink(&b, &a).unwrap();
+        symlink(&a, &b).unwrap();
+        assert!(check_picture(&a).is_err());
+    }
+
+    #[test]
+    fn a_pipe_or_a_folder_named_like_a_picture_is_not_waited_for() {
+        use std::ffi::CString;
+        let dir = Scratch::new("picture-pipe");
+        let fifo = dir.path("pipe.png");
+        let c = CString::new(fifo.as_str()).unwrap();
+        // SAFETY: a valid NUL-terminated path.
+        assert_eq!(unsafe { libc::mkfifo(c.as_ptr(), 0o600) }, 0);
+        let started = std::time::Instant::now();
+        assert!(check_picture(&fifo).is_err());
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+        let folder = dir.path("folder.png");
+        std::fs::create_dir(&folder).unwrap();
+        assert!(check_picture(&folder).is_err());
     }
 }

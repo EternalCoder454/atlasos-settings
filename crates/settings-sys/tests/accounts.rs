@@ -46,12 +46,34 @@ fn changes_a_users_name_picture_and_type() {
     let Some(bus) = start() else { return };
     let a = Accounts::new(&bus.bus()).expect("connect");
     a.set_real_name(1000, "  Ada King  ").expect("name");
-    a.set_icon(1000, "/home/ada/me.jpg").expect("icon");
+    // A picture that is one (a JPEG by its contents) is handed on by its real
+    // path; one that isn't, or isn't there, never reaches the bus.
+    let dir = std::env::temp_dir().join(format!("settings-sys-accounts-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("scratch folder");
+    let jpeg = dir.join("me.jpg");
+    std::fs::write(
+        &jpeg,
+        [
+            0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, b'J', b'F', b'I', b'F', 0, 1,
+        ],
+    )
+    .unwrap();
+    let not_a_picture = dir.join("notes.jpg");
+    std::fs::write(&not_a_picture, "#!/bin/sh\necho hello\n").unwrap();
+    for bad in [not_a_picture.to_str().unwrap(), "/home/ada/missing.jpg"] {
+        assert_eq!(a.set_icon(1000, bad).unwrap_err().kind, ErrorKind::Refused);
+    }
+    assert_eq!(
+        a.user(1000).unwrap().icon,
+        "/var/lib/AccountsService/icons/ada.png"
+    );
+    a.set_icon(1000, jpeg.to_str().unwrap()).expect("icon");
+    let want = std::fs::canonicalize(&jpeg).unwrap();
     a.set_admin(1001, true).expect("admin");
     a.set_auto_login(1000, true).expect("auto login");
     let ada = a.user(1000).expect("user");
     assert_eq!(ada.real_name, "Ada King");
-    assert_eq!(ada.icon, "/home/ada/me.jpg");
+    assert_eq!(ada.icon, want.to_str().unwrap());
     assert!(ada.auto_login);
     assert!(a.user(1001).unwrap().admin);
 
@@ -67,6 +89,7 @@ fn changes_a_users_name_picture_and_type() {
         ErrorKind::Refused
     );
     assert_eq!(a.user(1000).unwrap().real_name, "Ada King");
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -84,7 +107,8 @@ fn the_password_goes_as_a_hash_never_as_text() {
     )
     .try_into()
     .expect("a string");
-    assert!(hash.starts_with("$6$"), "{hash}");
+    // A yescrypt hash (Fedora's libcrypt has it), else SHA-512; never text.
+    assert!(hash.starts_with("$y$") || hash.starts_with("$6$"), "{hash}");
     assert!(!hash.contains("correct"));
     assert_eq!(
         a.set_password(1000, "").unwrap_err().kind,
@@ -120,7 +144,7 @@ fn adds_and_removes_a_user() {
     )
     .try_into()
     .expect("a string");
-    assert!(hash.starts_with("$6$"));
+    assert!(hash.starts_with("$y$") || hash.starts_with("$6$"), "{hash}");
     assert_eq!(a.users().unwrap().len(), 3);
 
     // The same name twice is the service's refusal.

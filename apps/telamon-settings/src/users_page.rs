@@ -114,10 +114,6 @@ pub mod qobject {
         #[cxx_name = "validRealName"]
         fn valid_real_name(self: &UsersPage, name: &QString) -> bool;
 
-        #[qinvokable]
-        #[cxx_name = "validPicture"]
-        fn valid_picture(self: &UsersPage, path: &QString) -> bool;
-
         /// A sign-in name for a full name.
         #[qinvokable]
         #[cxx_name = "suggestUserName"]
@@ -322,8 +318,21 @@ impl qobject::UsersPage {
     }
 
     /// Runs change `job`, then reads everything again.
-    fn change<J>(mut self: Pin<&mut Self>, what: &'static str, job: J)
+    fn change<J>(self: Pin<&mut Self>, what: &'static str, job: J)
     where
+        J: FnOnce() -> Result<(), Error> + Send + 'static,
+    {
+        self.change_saying(what, job, |_| None);
+    }
+
+    /// Like [`change`](Self::change), with `say` first to tell what went wrong
+    /// in the person's words, when the job knows (a picture that won't do).
+    fn change_saying<J>(
+        mut self: Pin<&mut Self>,
+        what: &'static str,
+        job: J,
+        say: fn(&Error) -> Option<String>,
+    ) where
         J: FnOnce() -> Result<(), Error> + Send + 'static,
     {
         if self.rust().busy {
@@ -345,7 +354,7 @@ impl qobject::UsersPage {
                     Some((result, read)) => {
                         o.as_mut().show(Some(read));
                         if let Err(e) = result {
-                            let text = describe(what, &e);
+                            let text = say(&e).unwrap_or_else(|| describe(what, &e));
                             o.as_mut().set_error(qs(&text));
                         }
                     }
@@ -367,9 +376,17 @@ impl qobject::UsersPage {
 
     pub fn change_picture(self: Pin<&mut Self>, uid: i32, path: &QString) {
         let path = path.to_string();
-        self.change("changing the picture", move || {
-            Accounts::new(&Bus::System)?.set_icon(uid_of(uid)?, &path)
-        });
+        // The file is looked at on the worker thread (it may be on a slow
+        // disk), and the reason it won't do is said in words.
+        self.change_saying(
+            "changing the picture",
+            move || Accounts::new(&Bus::System)?.set_icon(uid_of(uid)?, &path),
+            |e| {
+                e.detail
+                    .strip_prefix(accounts::PICTURE_PREFIX)
+                    .map(str::to_string)
+            },
+        );
     }
 
     pub fn change_password(self: Pin<&mut Self>, uid: i32, password: &QString) {
@@ -528,10 +545,6 @@ impl qobject::UsersPage {
 
     pub fn valid_real_name(&self, name: &QString) -> bool {
         accounts::valid_real_name(&name.to_string())
-    }
-
-    pub fn valid_picture(&self, path: &QString) -> bool {
-        accounts::valid_icon_path(&path.to_string())
     }
 
     pub fn suggest_user_name(&self, real_name: &QString) -> QString {
